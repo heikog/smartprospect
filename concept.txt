@@ -1,0 +1,188 @@
+Smart Prospect – Produktkonzept (Stand: 01.11.2025)
+====================================================
+
+Dieses Dokument bündelt alle aktuellen Entscheidungen für Smart Prospect. Es dient als Referenz für Produkt, Tech und Operations. Checklisten helfen, Fortschritt zu verfolgen – besonders wenn wir an einem anderen Rechner weiterarbeiten.
+
+----------------------------------------------------
+1. Produktüberblick
+----------------------------------------------------
+- SaaS-Plattform für automatisierte, personalisierte Multichannel-B2B-Kampagnen.
+- Kernassets je Prospect: personalisierter PDF-Mailer mit QR-Code, Avatar-Video, Audio-Pitch, Präsentation, personalisierte Landingpage.
+- Fokus-Markt MVP: DACH, Sprache Deutsch.
+- Konsumentenseitig komplett offline (Druckmailing); E-Mail-Adressen werden erst über Landingpage erfasst.
+
+----------------------------------------------------
+2. Zielgruppen
+----------------------------------------------------
+- Agenturen für Vertrieb & Kommunikation.
+- Mittelständische B2B-Unternehmen mit erklärungsbedürftigen Produkten.
+- Beratungen / Dienstleister mit selektiven Zielkundenlisten.
+- Druckereien / Lettershops als Reseller oder Integrationspartner.
+
+----------------------------------------------------
+3. Wertversprechen
+----------------------------------------------------
+- Kampagnenaufbau in Minuten statt Tagen.
+- Multimodaler “Wow”-Effekt durch Kombination aus Print + Digital.
+- Skalierbar dank KI-gestützter Content-Erstellung.
+- Einfache UI, kein technisches Vorwissen erforderlich.
+
+----------------------------------------------------
+4. Kampagnen-User-Journey
+----------------------------------------------------
+1. Kampagne anlegen: Nutzer lädt Service-PDF hoch, importiert Prospect-Liste (CSV/XLSX).
+2. Generierung starten: Backend stößt n8n-Workflow an, Assets werden erstellt und in Supabase Storage abgelegt.
+3. Qualitätsprüfung: Nutzer prüft Stichproben via Freigabe-Popover, Kampagne erhält Freigabe.
+4. Versand: Nutzer triggert zweiten n8n-Workflow für Druckpartner-Lieferung.
+5. Tracking: Kampagne und Prospects behalten nachvollziehbare Statushistorie (Audit-Events folgen nach MVP).
+
+----------------------------------------------------
+5. Datenanforderungen & Upload
+----------------------------------------------------
+- Pflichtfelder pro Prospect: `url`, `anrede`, `vorname`, `nachname`, `strasse`, `hausnummer`, `plz`, `stadt`.
+- Optionale Felder aktuell keine; Firma/Organisation wird über n8n-Webrecherche ermittelt.
+- Avatar-Gender-Logik bleibt in n8n (nicht im UI sichtbar).
+- Dateigrößenlimit Service-PDF: 10 MB; Prospect-Liste: 20 MB.
+
+----------------------------------------------------
+6. Statusmodell (UX-Texte)
+----------------------------------------------------
+| Nutzer-Label             | System-Key        | Bedeutung / Trigger                                                         |
+|--------------------------|-------------------|-----------------------------------------------------------------------------|
+| Erstellt                 | `created`         | Kampagne angelegt, Dateien vorliegend.                                     |
+| In Bearbeitung           | `generating`      | n8n erzeugt Assets.                                                         |
+| Problem bei Generierung  | `generation_failed` | Fehler in n8n; UI bietet “Erneut versuchen”.                                |
+| Assets bereit            | `generated`       | Assets vollständig erstellt.                                                |
+| Zur Freigabe             | `ready_for_review`| Freigabedialog kann geöffnet werden.                                        |
+| Freigegeben              | `approved`        | Nutzer hat geprüft und bestätigt.                                           |
+| Bereit für Versand       | `ready_for_dispatch` | Versand-Workflow kann gestartet werden.                                    |
+| Versandt                 | `dispatched`      | PDFs an Druckpartner übermittelt, Workflow abgeschlossen.                   |
+
+Prospect-Status (Anzeige in Tabellen/Freigabe):
+- `creating` → “Wird erstellt”
+- `ready` → “Vollständig”
+- `error` → “Fehler – erneut generieren”
+
+----------------------------------------------------
+7. Architektur-Überblick
+----------------------------------------------------
+Komponenten
+- Frontend (Next/Vite-Prototyp): Landingpage & Dashboard inkl. Prospect-Landingpage-Preview.
+- Backend (Node/Edge oder Supabase Functions): Auth, Kampagnen-API, n8n-Webhooks, Statusmanagement.
+- Supabase: Auth (Magic Link), Postgres-Datenhaltung, Storage (Kampagnen-Dateien), Realtime.
+- n8n (self-hosted): Zwei Workflows (Generierung, Versand) orchestrieren KI- und Druckpartner-Aufgaben.
+- Stripe: Credit-basiertes Abrechnungsmodell (Pay-per-Campaign).
+
+Verzeichnisse & Storage
+- Storage-Bucket `campaigns`: `/inputs/{campaignId}/service.pdf`, `/prospects/{campaignId}/{prospectId}/[assets]`.
+- Optional Bucket `landingpages` für JSON/Assets der personalisierten Seiten (oder im selben Bucket wie oben).
+
+----------------------------------------------------
+8. Kommunikation Backend ↔ n8n ↔ Supabase
+----------------------------------------------------
+Workflow “Generate Campaign”
+1. Backend erstellt Kampagne & Prospects in Supabase, legt Dateien in Storage ab.
+2. Backend ruft `N8N_GENERATE_WEBHOOK_URL` mit Payload (`campaignId`, signierte Download-URLs, Service PDF Pfad, optional Callback-Secret).
+3. n8n lädt Daten, reichert Prospects an, erstellt Assets (Heygen, ElevenLabs, Gamma, PDFMonkey).
+4. n8n speichert Resultate direkt in Supabase Storage (Service-Key) unter `campaigns/{campaignId}/prospects/{prospectId}/...` und aktualisiert `prospects.asset_status`, `prospects.asset_paths`, `campaigns.summary`.
+5. Bei Fehlern setzt n8n Kampagne auf `generation_failed` und schreibt Fehlermeldung in `campaign_events`.
+6. Bei Erfolg setzt n8n Kampagne auf `generated`, optionaler Callback an Backend (`N8N_STATUS_CALLBACK_URL` mit Signatur).
+
+Workflow “Dispatch Campaign”
+1. Nutzer klickt “Versand starten”; Backend setzt Kampagne auf `ready_for_dispatch` und ruft `N8N_DISPATCH_WEBHOOK_URL`.
+2. Backend übermittelt Manifest (PDF-Links, Versandoptionen, Druckpartner).
+3. n8n aggregiert PDFs (z.B. ZIP), leitet an Druckpartner via E-Mail/API/SFTP weiter.
+4. n8n aktualisiert Supabase (`campaigns.status = dispatched`, Zeitstempel; `prospects.dispatched_at`), schreibt Event.
+5. Bei Fehlern setzt n8n `campaigns.status = dispatch_failed` (optional) + Fehlermeldung, Backend zeigt Hinweis.
+
+Realtime & UI
+- Backend pusht Status-Updates via Supabase Realtime Channel `campaign_updates:{campaignId}`.
+- UI reagiert auf Statuswechsel (Buttons, Badges).
+
+----------------------------------------------------
+9. Supabase Setup
+----------------------------------------------------
+- [ ] Projekt in EU-Region anlegen.
+- [ ] Auth aktivieren (Magic Link).
+- [ ] Storage-Bucket `campaigns` erstellen (Public Access aus).
+- [ ] Tabellen anlegen (SQL siehe `supabase/schema/001_init.sql`):
+  - `users`
+  - `campaigns`
+  - `prospects`
+  - `campaign_events`
+- [ ] Policies: Row-Level Security aktivieren, Policies für Nutzerzugriff pro Kampagne (Details folgen in Migration).
+- [ ] Service-Role-Key in n8n & Backend hinterlegen.
+- [ ] Edge Functions/REST-RPC für Landingpage-Content optional vorbereiten.
+
+----------------------------------------------------
+10. Stripe Setup
+----------------------------------------------------
+- [ ] Produkt “Smart Prospect Credits” anlegen.
+- [ ] Preise:
+  - `STRIPE_PRICE_ID_CAMPAIGN_BASE` (Basispreis pro Kampagne, z.B. 49 €)
+  - `STRIPE_PRICE_ID_PROSPECT_CREDIT` (Preis pro Prospect, z.B. 0,99 €)
+- [ ] Webhook Endpoint für Zahlungen (`/stripe/webhook`) konfigurieren.
+- [ ] Test- & Live-Keys getrennt speichern.
+- [ ] Optional: Customer Portal aktivieren.
+
+----------------------------------------------------
+11. Environment Variablen (Backend / Frontend / n8n)
+----------------------------------------------------
+Allgemein
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (Backend + n8n, sicher verwahren)
+- `SUPABASE_STORAGE_BUCKET_CAMPAIGNS=campaigns`
+- `SUPABASE_REST_URL` (für direkte REST-Aufrufe)
+
+Backend
+- `N8N_GENERATE_WEBHOOK_URL`
+- `N8N_DISPATCH_WEBHOOK_URL`
+- `N8N_WEBHOOK_SECRET` (Signaturprüfung)
+- `STRIPE_API_KEY`
+- `STRIPE_PRICE_ID_CAMPAIGN_BASE`
+- `STRIPE_PRICE_ID_PROSPECT_CREDIT`
+- `APP_URL` (für Landingpage-Links & QR-Codes)
+- `FRONTEND_PREVIEW_URL` (optional, falls abweichend)
+
+n8n
+- `SUPABASE_SERVICE_ROLE_KEY` (über Credentials)
+- `SUPABASE_URL`
+- `HEYGEN_API_KEY`
+- `ELEVENLABS_API_KEY`
+- `OPENAI_API_KEY`
+- `GAMMA_API_KEY`
+- `PDFMONKEY_API_KEY`
+- `STATUS_CALLBACK_URL` + `STATUS_CALLBACK_SECRET` (falls genutzt)
+- Diese Keys liegen ausschließlich in der n8n-Umgebung (nicht im Backend-Repo).
+
+Frontend
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_APP_URL`
+
+----------------------------------------------------
+12. Landingpage-Template
+----------------------------------------------------
+- Route: `/preview/[campaignId]/[prospectId]`.
+- Backend liefert JSON (Prospect-Daten, Asset-Links) aus Supabase.
+- QR-Code im PDF kodiert URL mit beiden Parametern.
+- Seite enthält Video-, Audio-, Präsentations- und PDF-Teaser + Formular (E-Mail & Telefon).
+
+----------------------------------------------------
+13. TODO / Offene Punkte
+----------------------------------------------------
+- [ ] Supabase Policy-Details definieren (Welche Rollen, welche Views?).
+- [ ] Backend-API-Routen und Auth-Flows spezifizieren (z.B. Next.js API Route vs. Supabase Functions).
+- [ ] Definieren, wie “Erneut generieren” technisch in n8n getriggert wird.
+- [ ] Versand-Workflow für verschiedene Druckpartner konkretisieren (E-Mail vs. API).
+- [ ] Audit-Trail-Konzept (nach MVP) erarbeiten.
+
+----------------------------------------------------
+14. Deployment (Render.com)
+----------------------------------------------------
+- [ ] Repository mit Render verbinden; Branch `master` (oder Hauptbranch) baut automatisch.
+- [ ] Render Web Service (Build Command z.B. `npm install && npm run build`, Start Command `npm run start` entsprechend der späteren Backend-Technologie).
+- [ ] Keine lokale Umgebung: alle Tests/Staging-Builds laufen über Render Deployments.
+- [ ] Environment Variablen pro Render-Service eintragen (siehe Abschnitt 11); Third-Party-AI-Keys nur im n8n-Host konfigurieren.
+- [ ] Nach erstem Deploy zusätzlich Supabase-Service-Key und Stripe Keys im Render-Dashboard setzen.
