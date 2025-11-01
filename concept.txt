@@ -1,188 +1,266 @@
-Smart Prospect – Produktkonzept (Stand: 01.11.2025)
-====================================================
+Smart Prospect – MVP Blueprint (Stand: 01.11.2025)
+===================================================
 
-Dieses Dokument bündelt alle aktuellen Entscheidungen für Smart Prospect. Es dient als Referenz für Produkt, Tech und Operations. Checklisten helfen, Fortschritt zu verfolgen – besonders wenn wir an einem anderen Rechner weiterarbeiten.
+Diese Fassung ersetzt den bisherigen Prototyp-Entwurf. Sie beschreibt den lauffähigen MVP mit Login, Credits, Kampagnen-Workflows und Integration in Supabase/n8n. Das Dokument ist verbindliche Referenz für Produkt, Technik und Operations.
+
+----------------------------------------------------
+0. Quick Checklist
+----------------------------------------------------
+- [ ] Magic-Link-Auth über Supabase läuft, 50 Start-Credits beim ersten Login.
+- [ ] Dashboard zeigt echte Daten aus Supabase (Kampagnenliste, Credits, Prospects).
+- [ ] Kampagnenstatus-Wechsel triggern Supabase-Updates und n8n-Webhooks.
+- [ ] Landingpage-CTA führt in Auth-Flow, Absicherung sämtlicher App-Routen.
+- [ ] Render-Deploy nutzt `npm run start` (serve) mit korrekten ENV-Variablen.
+- [ ] Logout & Session-Cleanup implementiert, Profil-Löschung als Soft-Delete möglich.
+- [ ] Credit-/Billing-Historie sichtbar (Ledger), alle Bewegungen serverseitig erfasst.
+- [ ] Drop-All-Skript vorhanden, um Supabase-Objekte sauber neu aufzusetzen.
 
 ----------------------------------------------------
 1. Produktüberblick
 ----------------------------------------------------
-- SaaS-Plattform für automatisierte, personalisierte Multichannel-B2B-Kampagnen.
-- Kernassets je Prospect: personalisierter PDF-Mailer mit QR-Code, Avatar-Video, Audio-Pitch, Präsentation, personalisierte Landingpage.
-- Fokus-Markt MVP: DACH, Sprache Deutsch.
-- Konsumentenseitig komplett offline (Druckmailing); E-Mail-Adressen werden erst über Landingpage erfasst.
+- **Zweck**: Automatisierte, personalisierte Multichannel-B2B-Kampagnen erzeugen und versenden.
+- **Kernfunktionen MVP**:
+  1. Nutzerkonto via Magic Link (Supabase Auth).
+  2. Credit-Konto (Startguthaben 50 Credits, Abzug pro Kampagne).
+  3. Kampagnen-Workflow (Upload, Generierung, Freigabe, Versand).
+  4. n8n-Integration zur Asset-Erstellung und Druckpartner-Anbindung.
+  5. Personalisierte Landingpages je Prospect.
+- **Zielgruppe**: B2B-Vertriebsteams, Agenturen, Dienstleister mit kuratierten Prospect-Listen.
 
 ----------------------------------------------------
-2. Zielgruppen
+2. Nutzer- & Auth-Flow
 ----------------------------------------------------
-- Agenturen für Vertrieb & Kommunikation.
-- Mittelständische B2B-Unternehmen mit erklärungsbedürftigen Produkten.
-- Beratungen / Dienstleister mit selektiven Zielkundenlisten.
-- Druckereien / Lettershops als Reseller oder Integrationspartner.
+### 2.1 Landingpage
+- “Kostenlos starten” öffnet Magic-Link-Anmeldung.
+- Beim Klick wird E-Mail abgefragt, Supabase sendet Login-Link.
+
+### 2.2 Erstregistrierung
+- Nach erfolgreicher Bestätigung legt Supabase den User an (`auth.users`).
+- Trigger `handle_new_user()` in Supabase:
+  - erzeugt Profil in Tabelle `profiles`,
+  - vergibt initial 50 Credits (Eintrag in `credit_ledger`),
+  - setzt `onboarding_completed` = false.
+
+### 2.3 Login
+- Frontend hält Session via `supabase.auth.onAuthStateChange`.
+- Geschützte Routen (Dashboard, Kampagnen) nur mit gültigem Session Token.
+- Logout löscht Session aus Supabase Client.
 
 ----------------------------------------------------
-3. Wertversprechen
+3. Datenmodell Supabase
 ----------------------------------------------------
-- Kampagnenaufbau in Minuten statt Tagen.
-- Multimodaler “Wow”-Effekt durch Kombination aus Print + Digital.
-- Skalierbar dank KI-gestützter Content-Erstellung.
-- Einfache UI, kein technisches Vorwissen erforderlich.
+### 3.1 Tabellen
+- `profiles`
+  | Feld               | Typ        | Beschreibung                          |
+  |--------------------|------------|---------------------------------------|
+  | `id`               | uuid PK    | identisch zu `auth.users.id`          |
+  | `email`            | text       | unique                                |
+  | `credits`          | integer    | aktuelles Guthaben (>=0)              |
+  | `created_at`       | timestamptz|                                       |
+  | `deleted_at`       | timestamptz| Soft-Delete Marker (NULL = aktiv)     |
+  | `onboarding_completed` | bool  | zeigt, ob erstes Dashboard-Setup erledigt |
+
+- `credit_ledger`
+  | Feld           | Typ         | Beschreibung                                    |
+  |----------------|-------------|-------------------------------------------------|
+  | `id`           | bigserial   | PK                                              |
+  | `profile_id`   | uuid FK     | -> profiles                                     |
+  | `change`       | integer     | +50 Startguthaben, -49 Kampagne, etc.           |
+  | `reason`       | text        | `signup_bonus`, `campaign_base`, `prospect_fee`, `manual_adjustment`, … |
+  | `meta`         | jsonb       | Zusatzinfos (z.B. Kampagnen-ID)                 |
+  | `created_at`   | timestamptz |                                                 |
+
+- `campaigns` (aktualisiert)
+  | Feld              | Typ                     | Beschreibung                           |
+  |-------------------|-------------------------|----------------------------------------|
+  | `id`              | uuid PK                 |                                         |
+  | `owner_id`        | uuid FK -> profiles     |                                         |
+  | `name`            | text                    |                                         |
+  | `service_pdf_path`| text                    | Storage-Pfad                           |
+  | `total_prospects` | integer                 |                                         |
+  | `status`          | enum `campaign_status`  | siehe Abschnitt 5                      |
+  | `credit_cost`     | integer                 | abgerechnete Credits                   |
+  | `created_at`      | timestamptz             |                                         |
+  | `updated_at`      | timestamptz             |                                         |
+  | `approved_at`     | timestamptz             | optional                                |
+  | `dispatched_at`   | timestamptz             | optional                                |
+
+- `prospects` (wie bisher, erweitert um `email_capture_status`, `qr_url`)
+
+- `campaign_events`
+  - loggt Statuswechsel, Credit-Abzüge, Webhook-Rückmeldungen.
+
+### 3.2 Policies (Auszug)
+- `profiles`: Nutzer darf nur eigenes Profil lesen/aktualisieren, Service Role Vollzugriff.
+- `credit_ledger`: select nur Owner; insert nur Service Role + Edge Function.
+- `campaigns`, `prospects`, `campaign_events`: wie bisher, + Eindeutige `owner_id`-Checks.
+
+### 3.3 Trigger & Funktionen
+1. `handle_new_user()` – `AFTER INSERT` auf `auth.users`.
+   - Erstellt Profil, führt `credit_ledger`-Eintrag +50 aus.
+2. `deduct_campaign_credits(profile_id uuid, campaign_id uuid, prospects int)`:
+   - zieht 49 Basis + `prospects` Credits ab (nur wenn Guthaben reicht),
+   - protokolliert in Ledger,
+   - liefert Fehler zurück, falls Guthaben < Kosten.
+3. `refund_campaign(profile_id uuid, campaign_id uuid)` – optional für Fehlfälle.
 
 ----------------------------------------------------
-4. Kampagnen-User-Journey
+4. MVP-Produkt-Flow Ende-zu-Ende
 ----------------------------------------------------
-1. Kampagne anlegen: Nutzer lädt Service-PDF hoch, importiert Prospect-Liste (CSV/XLSX).
-2. Generierung starten: Backend stößt n8n-Workflow an, Assets werden erstellt und in Supabase Storage abgelegt.
-3. Qualitätsprüfung: Nutzer prüft Stichproben via Freigabe-Popover, Kampagne erhält Freigabe.
-4. Versand: Nutzer triggert zweiten n8n-Workflow für Druckpartner-Lieferung.
-5. Tracking: Kampagne und Prospects behalten nachvollziehbare Statushistorie (Audit-Events folgen nach MVP).
+### 4.1 Registrierung & Onboarding
+1. User klickt “Kostenlos starten”.
+2. Gibt E-Mail ein → Supabase verschickt Magic Link.
+3. Nach Login ruft Frontend `/api/me` (Edge Function oder Supabase RPC) auf:
+   - liest Profil + Credits,
+   - falls `onboarding_completed = false`, zeigt kurzen Onboarding-Prompt (z.B. “Prospect-Liste vorbereiten”).
+
+### 4.2 Kampagne erstellen
+1. Nutzer wählt “Neue Kampagne”.
+2. Upload Excel + PDF → Frontend speichert Dateien zunächst lokal (Memory) → sendet an Supabase Storage (signed upload).
+3. Frontend ruft `POST /api/campaigns`:
+   - prüft Credits (RPC `deduct_campaign_credits`), legt `campaigns`-Datensatz + Prospects an.
+   - Antwort: Kampagne mit Status `created`.
+
+### 4.3 Generierung
+1. Nutzer klickt “Generierung starten”.
+2. Backend (Edge Function) ruft n8n Generate Workflow via Webhook (inkl. Kampagnen-ID, Storage-Pfade, Service Keys).
+3. n8n erzeugt Assets, legt sie in Storage, aktualisiert Supabase (Status `generated`, `prospects.asset_paths`, etc.).
+4. Supabase Realtime informiert Frontend (Statuswechsel → Buttons aktualisieren).
+
+### 4.4 Freigabe/Qualitätsprüfung
+1. UI lädt Prospect-Sampling (`prospects` + Asset-Links).
+2. Nach Freigabe → Status `approved`, Event im Ledger (keine zusätzlichen Credits).
+3. Optionaler Re-Trigger, falls n8n Fehler meldet (`generation_failed` → “Erneut versuchen”).
+
+### 4.5 Versand
+1. Button “Versand starten” ruft Edge Function → n8n Dispatch Workflow.
+2. n8n packt PDFs, übermittelt an Druckpartner, zurück an Supabase: Status `dispatched`.
+3. Event-Log + zeitliche Kennzeichnung.
+
+### 4.6 Nachverfolgung
+- Prospect-Landingpages bleiben live, QR-Code zeigt auf `/preview/{campaignId}/{prospectId}` (rendered via Supabase Data).
+- Optionale Lead-Form speichert E-Mail/Telefon in `prospect_leads` (neue Tabelle).
 
 ----------------------------------------------------
-5. Datenanforderungen & Upload
+5. Status- & Credit-Logik
 ----------------------------------------------------
-- Pflichtfelder pro Prospect: `url`, `anrede`, `vorname`, `nachname`, `strasse`, `hausnummer`, `plz`, `stadt`.
-- Optionale Felder aktuell keine; Firma/Organisation wird über n8n-Webrecherche ermittelt.
-- Avatar-Gender-Logik bleibt in n8n (nicht im UI sichtbar).
-- Dateigrößenlimit Service-PDF: 10 MB; Prospect-Liste: 20 MB.
+### 5.1 Kampagnenstatus (unverändert, jetzt strikt durchgesetzt)
+`created` → `generating` → `generated` → `ready_for_review` → `approved` → `ready_for_dispatch` → `dispatched`
+Fehlerpfade: `generation_failed`, `dispatch_failed`.
+
+### 5.2 Credit-Regeln
+- **Signup Bonus**: +50 Credits.
+- **Kampagne erstellen**: -49 Credits Basis (abgezogen bei Anlage).
+- **Prospect Fee**: -1 je Prospect (direkt bei Anlage).
+- **Refund**: Nur manuell via Admin-Panel oder Edge Function (noch zu spezifizieren).
+
+### 5.3 UI-Anzeigen
+- Dashboard-Header zeigt Credits + Verlaufs-CTA (Ledger Popup).
+- Bei Kreditmangel: Kampagne kann nicht erstellt werden → UI bietet “Credits kaufen” (Stripe-Integration in Phase 2).
 
 ----------------------------------------------------
-6. Statusmodell (UX-Texte)
+6. Integrationen
 ----------------------------------------------------
-| Nutzer-Label             | System-Key        | Bedeutung / Trigger                                                         |
-|--------------------------|-------------------|-----------------------------------------------------------------------------|
-| Erstellt                 | `created`         | Kampagne angelegt, Dateien vorliegend.                                     |
-| In Bearbeitung           | `generating`      | n8n erzeugt Assets.                                                         |
-| Problem bei Generierung  | `generation_failed` | Fehler in n8n; UI bietet “Erneut versuchen”.                                |
-| Assets bereit            | `generated`       | Assets vollständig erstellt.                                                |
-| Zur Freigabe             | `ready_for_review`| Freigabedialog kann geöffnet werden.                                        |
-| Freigegeben              | `approved`        | Nutzer hat geprüft und bestätigt.                                           |
-| Bereit für Versand       | `ready_for_dispatch` | Versand-Workflow kann gestartet werden.                                    |
-| Versandt                 | `dispatched`      | PDFs an Druckpartner übermittelt, Workflow abgeschlossen.                   |
+### 6.1 Supabase Functions / Edge
+- `POST /api/campaigns` – erstellt Kampagne, ruft `deduct_campaign_credits`.
+- `POST /api/campaigns/{id}/generate` – startet n8n Workflow.
+- `POST /api/campaigns/{id}/approve` – setzt Status, evtl. ruft n8n QA.
+- `POST /api/campaigns/{id}/dispatch` – n8n Versandtrigger.
+- `GET /api/me` – liefert Profil, Credits, Kampagnenübersicht.
+- Auth: JWT aus Supabase-Session (Frontend übergibt `Authorization: Bearer {access_token}`).
 
-Prospect-Status (Anzeige in Tabellen/Freigabe):
-- `creating` → “Wird erstellt”
-- `ready` → “Vollständig”
-- `error` → “Fehler – erneut generieren”
+### 6.2 n8n
+- **Generate Workflow**:
+  1. Eingabe: Kampagnen-ID, Storage URLs, Service-Key.
+  2. Aktionen: Heygen, ElevenLabs, Gamma, PDFMonkey, Landingpage-JSON.
+  3. Ausgabe: Update Supabase (Storage-Pfade, Status).
 
-----------------------------------------------------
-7. Architektur-Überblick
-----------------------------------------------------
-Komponenten
-- Frontend (Next/Vite-Prototyp): Landingpage & Dashboard inkl. Prospect-Landingpage-Preview.
-- Backend (Node/Edge oder Supabase Functions): Auth, Kampagnen-API, n8n-Webhooks, Statusmanagement.
-- Supabase: Auth (Magic Link), Postgres-Datenhaltung, Storage (Kampagnen-Dateien), Realtime.
-- n8n (self-hosted): Zwei Workflows (Generierung, Versand) orchestrieren KI- und Druckpartner-Aufgaben.
-- Stripe: Credit-basiertes Abrechnungsmodell (Pay-per-Campaign).
+- **Dispatch Workflow**:
+  1. Eingabe: Kampagnen-ID.
+  2. Aktionen: PDFs als ZIP, Versand an Druckpartner, Supabase-Update.
 
-Verzeichnisse & Storage
-- Storage-Bucket `campaigns`: `/inputs/{campaignId}/service.pdf`, `/prospects/{campaignId}/{prospectId}/[assets]`.
-- Optional Bucket `landingpages` für JSON/Assets der personalisierten Seiten (oder im selben Bucket wie oben).
+### 6.3 Stripe (Phase 2 – nicht MVP)
+- Payment Intent für Credit-Pakete.
+- Webhook -> Supabase Edge Function -> Credits gutschreiben + Ledger-Eintrag.
 
 ----------------------------------------------------
-8. Kommunikation Backend ↔ n8n ↔ Supabase
+7. Frontend MVP Scope
 ----------------------------------------------------
-Workflow “Generate Campaign”
-1. Backend erstellt Kampagne & Prospects in Supabase, legt Dateien in Storage ab.
-2. Backend ruft `N8N_GENERATE_WEBHOOK_URL` mit Payload (`campaignId`, signierte Download-URLs, Service PDF Pfad, optional Callback-Secret).
-3. n8n lädt Daten, reichert Prospects an, erstellt Assets (Heygen, ElevenLabs, Gamma, PDFMonkey).
-4. n8n speichert Resultate direkt in Supabase Storage (Service-Key) unter `campaigns/{campaignId}/prospects/{prospectId}/...` und aktualisiert `prospects.asset_status`, `prospects.asset_paths`, `campaigns.summary`.
-5. Bei Fehlern setzt n8n Kampagne auf `generation_failed` und schreibt Fehlermeldung in `campaign_events`.
-6. Bei Erfolg setzt n8n Kampagne auf `generated`, optionaler Callback an Backend (`N8N_STATUS_CALLBACK_URL` mit Signatur).
+### 7.1 Pages & Routes
+| Route                  | Guard     | Inhalt |
+|------------------------|-----------|--------|
+| `/`                   | Public    | Landingpage, CTA → Login |
+| `/auth/signin`        | Public    | Magic-Link Formular (Supabase Auth UI) |
+| `/dashboard`          | Private   | Credits, Kampagnenliste, CTA “Neue Kampagne” |
+| `/campaign/:id`       | Private   | Kampagnen-Detail inkl. Statusaktionen |
+| `/preview/:campaignId/:prospectId` | Public (signiert optional) | Personalisierte Prospect-Seite |
 
-Workflow “Dispatch Campaign”
-1. Nutzer klickt “Versand starten”; Backend setzt Kampagne auf `ready_for_dispatch` und ruft `N8N_DISPATCH_WEBHOOK_URL`.
-2. Backend übermittelt Manifest (PDF-Links, Versandoptionen, Druckpartner).
-3. n8n aggregiert PDFs (z.B. ZIP), leitet an Druckpartner via E-Mail/API/SFTP weiter.
-4. n8n aktualisiert Supabase (`campaigns.status = dispatched`, Zeitstempel; `prospects.dispatched_at`), schreibt Event.
-5. Bei Fehlern setzt n8n `campaigns.status = dispatch_failed` (optional) + Fehlermeldung, Backend zeigt Hinweis.
+### 7.2 State Management
+- Supabase Auth Client (Session Listener).
+- React Query oder einfache Hooks für Supabase-Aufrufe (Caching, Loading States).
+- Error Handling global (Toast/sonner), besonders für Credit-Fehler.
 
-Realtime & UI
-- Backend pusht Status-Updates via Supabase Realtime Channel `campaign_updates:{campaignId}`.
-- UI reagiert auf Statuswechsel (Buttons, Badges).
-
-----------------------------------------------------
-9. Supabase Setup
-----------------------------------------------------
-- [ ] Projekt in EU-Region anlegen.
-- [ ] Auth aktivieren (Magic Link).
-- [ ] Storage-Bucket `campaigns` erstellen (Public Access aus).
-- [ ] Tabellen anlegen (SQL siehe `supabase/schema/001_init.sql`):
-  - `users`
-  - `campaigns`
-  - `prospects`
-  - `campaign_events`
-- [ ] Policies: Row-Level Security aktivieren, Policies für Nutzerzugriff pro Kampagne (Details folgen in Migration).
-- [ ] Service-Role-Key in n8n & Backend hinterlegen.
-- [ ] Edge Functions/REST-RPC für Landingpage-Content optional vorbereiten.
+### 7.3 Upload Handling
+- Excel + PDF werden direkt über Supabase Storage Upload API hochgeladen (signierte URL).
+- Fortschritt & Validierung im UI (Dateitypen, Größe).
 
 ----------------------------------------------------
-10. Stripe Setup
+8. Deployment & Environments
 ----------------------------------------------------
-- [ ] Produkt “Smart Prospect Credits” anlegen.
-- [ ] Preise:
-  - `STRIPE_PRICE_ID_CAMPAIGN_BASE` (Basispreis pro Kampagne, z.B. 49 €)
-  - `STRIPE_PRICE_ID_PROSPECT_CREDIT` (Preis pro Prospect, z.B. 0,99 €)
-- [ ] Webhook Endpoint für Zahlungen (`/stripe/webhook`) konfigurieren.
-- [ ] Test- & Live-Keys getrennt speichern.
-- [ ] Optional: Customer Portal aktivieren.
+### 8.1 Render
+- Root Directory: `frontend`
+- Build: `npm install && npm run build`
+- Start: `npm run start`
+- ENV Variablen (Render Dashboard):
+  - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`, `VITE_DEMO_OWNER_ID`
+  - Für Edge Functions/Server (wenn separat): `SUPABASE_SERVICE_ROLE_KEY`, `N8N_*`
+
+### 8.2 Entwicklung
+- `frontend/.env.local` mit echten Supabase-Werten.
+- Supabase CLI optional für lokale DB-Simulation (`npx supabase start`).
+- n8n lokal oder via Cloud-Instance (Konfiguration separat dokumentieren).
 
 ----------------------------------------------------
-11. Environment Variablen (Backend / Frontend / n8n)
+9. Roadmap MVP → Phase 2
 ----------------------------------------------------
-Allgemein
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY` (Backend + n8n, sicher verwahren)
-- `SUPABASE_STORAGE_BUCKET_CAMPAIGNS=campaigns`
-- `SUPABASE_REST_URL` (für direkte REST-Aufrufe)
-
-Backend
-- `N8N_GENERATE_WEBHOOK_URL`
-- `N8N_DISPATCH_WEBHOOK_URL`
-- `N8N_WEBHOOK_SECRET` (Signaturprüfung)
-- `STRIPE_API_KEY`
-- `STRIPE_PRICE_ID_CAMPAIGN_BASE`
-- `STRIPE_PRICE_ID_PROSPECT_CREDIT`
-- `APP_URL` (für Landingpage-Links & QR-Codes)
-- `FRONTEND_PREVIEW_URL` (optional, falls abweichend)
-
-n8n
-- `SUPABASE_SERVICE_ROLE_KEY` (über Credentials)
-- `SUPABASE_URL`
-- `HEYGEN_API_KEY`
-- `ELEVENLABS_API_KEY`
-- `OPENAI_API_KEY`
-- `GAMMA_API_KEY`
-- `PDFMONKEY_API_KEY`
-- `STATUS_CALLBACK_URL` + `STATUS_CALLBACK_SECRET` (falls genutzt)
-- Diese Keys liegen ausschließlich in der n8n-Umgebung (nicht im Backend-Repo).
-
-Frontend
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_APP_URL`
+1. **MVP (jetzt)**: Auth, Credits, Kampagnenflow, n8n-Integration, Landingpage.
+2. Phase 2: Stripe Billing, Admin-Console, tieferes Reporting, Audit Trails.
+3. Phase 3: Mehrsprachigkeit (EN), Team-Accounts, API-Zugriff.
 
 ----------------------------------------------------
-12. Landingpage-Template
+10. Offene Entscheidungen / Risiken
 ----------------------------------------------------
-- Route: `/preview/[campaignId]/[prospectId]`.
-- Backend liefert JSON (Prospect-Daten, Asset-Links) aus Supabase.
-- QR-Code im PDF kodiert URL mit beiden Parametern.
-- Seite enthält Video-, Audio-, Präsentations- und PDF-Teaser + Formular (E-Mail & Telefon).
+- [ ] Wie werden PDF/Assets bei fehlgeschlagener Generierung bereinigt? (Cleanup Job?)
+- [ ] Retry-Mechanismus für n8n Webhooks (Timeouts, Double Submit).
+- [ ] Druckpartner-Integration: E-Mail vs. SFTP vs. API – final festlegen.
+- [ ] Monitoring/Logging: Sentry? Supabase Log Drain?
+- [ ] DSGVO / Aufbewahrungsdauer: Auto-Löschjob nach 90 Tagen?
 
 ----------------------------------------------------
-13. TODO / Offene Punkte
+11. Nächste Schritte (tech)
 ----------------------------------------------------
-- [ ] Supabase Policy-Details definieren (Welche Rollen, welche Views?).
-- [ ] Backend-API-Routen und Auth-Flows spezifizieren (z.B. Next.js API Route vs. Supabase Functions).
-- [ ] Definieren, wie “Erneut generieren” technisch in n8n getriggert wird.
-- [ ] Versand-Workflow für verschiedene Druckpartner konkretisieren (E-Mail vs. API).
-- [ ] Audit-Trail-Konzept (nach MVP) erarbeiten.
+1. Supabase-Migrationen erweitern (Profiles, Ledger, Trigger).  
+2. Edge Functions / RPCs implementieren (`/api/me`, Kampagnen-Endpoints, Credit-Abzug).  
+3. Frontend: Auth-Flow + State anpassen, CTA mit Login verknüpfen.  
+4. Dashboard mit echten Daten, Buttons an API binden, Credit-Anzeige.  
+5. Render aktualisieren, Smoke-Test mit echtem Signup (Supabase Magic Link).  
+6. Dokumentation/Runbook für Operation (Wiederherstellung, Support).
 
 ----------------------------------------------------
-14. Deployment (Render.com)
+12. Account & Session Management
 ----------------------------------------------------
-- [ ] Repository mit Render verbinden; Branch `master` (oder Hauptbranch) baut automatisch.
-- [ ] Render Web Service (Build Command z.B. `npm install && npm run build`, Start Command `npm run start` entsprechend der späteren Backend-Technologie).
-- [ ] Keine lokale Umgebung: alle Tests/Staging-Builds laufen über Render Deployments.
-- [ ] Environment Variablen pro Render-Service eintragen (siehe Abschnitt 11); Third-Party-AI-Keys nur im n8n-Host konfigurieren.
-- [ ] Nach erstem Deploy zusätzlich Supabase-Service-Key und Stripe Keys im Render-Dashboard setzen.
+- **Logout**: Frontend ruft `supabase.auth.signOut()`, leitet zur Landingpage; Session-Listener räumt lokalen State auf.
+- **Profil löschen**: UI bietet “Account schließen”; Backend setzt `profiles.deleted_at = now()`, deaktiviert Supabase-User via Service Role (`auth.admin.deleteUser`). Kampagnen & Ledger bleiben erhalten, aber werden mit `deleted_at` markiert.
+- **Billing History**: Dashboard zeigt Ledger-Liste (`credit_ledger`) inkl. Datum, Betrag, Grund (z.B. `signup_bonus`, `campaign_base`). Export als CSV optional Phase 2.
+- **Audit**: Alle statusändernden Aktionen (Kampagne anlegen, Credits abbuchen, Versand triggern) werden serverseitig geloggt (`campaign_events`).
+
+----------------------------------------------------
+13. Datenpflege & Reset
+----------------------------------------------------
+- `001_init.sql` beginnt mit einem Drop-Block (Views, Tabellen, Functions, Types), sodass ein erneuter `supabase db push --file supabase/schema/001_init.sql` zuverlässig ein frisches Schema aufsetzt.
+- Dev-Setup: `supabase db push --file supabase/schema/001_init.sql` → Seeds (optional) → Frontend `.env.local` aktualisieren.
+
+Dieses Dokument ist jetzt das verbindliche MVP-Referenzdokument. Jegliche Abweichungen werden versioniert und abgestimmt.
+- `profiles`, `campaigns`, `prospects`, `credit_ledger`, `campaign_events` erhalten durchgehend ein `deleted_at` Feld; Löschvorgänge setzen dieses Feld, RLS filtert auf `deleted_at IS NULL`.
+- `credit_ledger`: select nur Owner; insert nur Service Role + Edge Function.
+-  Soft-Deletes berücksichtigen (`deleted_at IS NULL` in allen Policies).
