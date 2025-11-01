@@ -1,0 +1,14 @@
+# Environment files (keep templates tracked)
+frontend/.env.local
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+.env
+!.env.example
+
+# Build outputs
+frontend/build
+node_modules
+
+# Misc
+.DS_Store
