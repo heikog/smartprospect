@@ -4,18 +4,19 @@ import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database';
 import { env } from '../lib/env';
 
-export type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
-interface AuthContextValue {
+type AuthContextValue = {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error?: string } | void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-}
+};
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const MAGIC_EMAIL_STORAGE_KEY = 'smartprospect:pending-magic-email';
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -44,14 +45,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setLoading(true);
 
-        // Handle magic-link redirects (?/#access_token=...)
-        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-          const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
-          if (error) {
-            console.error('Magic link exchange failed', error);
+        const hasWindow = typeof window !== 'undefined';
+        if (hasWindow) {
+          const url = new URL(window.location.href);
+
+          // Magic link via hash fragment
+          if (url.hash.includes('access_token')) {
+            const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+            if (error) {
+              console.error('Magic link exchange failed', error);
+            } else {
+              window.localStorage.removeItem(MAGIC_EMAIL_STORAGE_KEY);
+            }
+            url.hash = '';
+            window.history.replaceState({}, document.title, url.toString());
+          } else {
+            // Magic link via verify endpoint (?token=...&type=magiclink)
+            const token = url.searchParams.get('token');
+            const type = url.searchParams.get('type');
+            if (token && type === 'magiclink') {
+              const pendingEmail = window.localStorage.getItem(MAGIC_EMAIL_STORAGE_KEY);
+              if (pendingEmail) {
+                const { data, error } = await supabase.auth.verifyOtp({
+                  email: pendingEmail,
+                  token,
+                  type: 'magiclink'
+                });
+                if (error) {
+                  console.error('Magic link verification failed', error);
+                } else if (data?.session) {
+                  setSession(data.session);
+                  const profileData = await fetchProfile(data.session.user.id);
+                  setProfile(profileData);
+                }
+                window.localStorage.removeItem(MAGIC_EMAIL_STORAGE_KEY);
+              } else {
+                console.warn('Magic link token received but no pending email stored.');
+              }
+
+              url.searchParams.delete('token');
+              url.searchParams.delete('type');
+              window.history.replaceState({}, document.title, url.toString());
+            }
           }
-          const cleanUrl = window.location.origin + window.location.pathname + window.location.search;
-          window.history.replaceState({}, document.title, cleanUrl);
         }
 
         const {
@@ -101,10 +137,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     signInWithEmail: async (email: string) => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(MAGIC_EMAIL_STORAGE_KEY, email.toLowerCase());
+      }
+      const redirectBase = env.appUrl.replace(/\/+$/, '');
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${env.appUrl}/auth`
+          emailRedirectTo: `${redirectBase}/auth`
         }
       });
       if (error) {
@@ -113,7 +153,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     signOut: async () => {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout failed', error);
+        return;
+      }
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(MAGIC_EMAIL_STORAGE_KEY);
+      }
+      setSession(null);
       setProfile(null);
     }
   }), [session, profile, loading]);
@@ -128,3 +176,6 @@ export function useAuth() {
   }
   return ctx;
 }
+
+export type { Profile };
+*** End Patch
