@@ -25,6 +25,8 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.deduct_campaign_credits(uuid, uuid, integer, text, jsonb) CASCADE;
 DROP FUNCTION IF EXISTS public.refund_campaign(uuid, uuid, integer, text, jsonb) CASCADE;
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS public.log_campaign_status_change() CASCADE;
+DROP TRIGGER IF EXISTS trg_log_campaign_status_change ON public.campaigns CASCADE;
 
 DROP TYPE IF EXISTS public.campaign_status CASCADE;
 DROP TYPE IF EXISTS public.prospect_status CASCADE;
@@ -349,9 +351,53 @@ BEGIN
     RAISE;
   END;
 
+  -- Log campaign creation event
+  INSERT INTO public.campaign_events (campaign_id, profile_id, event_type, message, payload)
+  VALUES (
+    v_campaign.id,
+    p_owner_id,
+    'campaign_created',
+    'Campaign created',
+    jsonb_build_object('name', p_name, 'total_prospects', p_total_prospects, 'total_cost', v_total_cost)
+  );
+
   RETURN (SELECT * FROM public.campaigns WHERE id = v_campaign.id);
 END;
 $$;
+
+-- -----------------------------------------------------------------------
+-- Trigger to log campaign status changes
+-- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.log_campaign_status_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF OLD.status IS DISTINCT FROM NEW.status THEN
+    INSERT INTO public.campaign_events (campaign_id, profile_id, event_type, message, payload)
+    VALUES (
+      NEW.id,
+      NEW.owner_id,
+      'status_changed',
+      format('Status changed from %s to %s', OLD.status, NEW.status),
+      jsonb_build_object(
+        'old_status', OLD.status,
+        'new_status', NEW.status,
+        'campaign_id', NEW.id
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_log_campaign_status_change
+AFTER UPDATE ON public.campaigns
+FOR EACH ROW
+WHEN (OLD.status IS DISTINCT FROM NEW.status)
+EXECUTE PROCEDURE public.log_campaign_status_change();
 
 -- -----------------------------------------------------------------------
 -- Row Level Security

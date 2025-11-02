@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card } from './ui/card';
+import { validateExcelFile } from '../services/excel';
 import {
   Upload,
   FileSpreadsheet,
@@ -28,7 +29,6 @@ interface CreateCampaignFormValues {
   name: string;
   excelFile: File;
   pdfFile: File;
-  prospectCount: number;
 }
 
 interface CreateCampaignProps {
@@ -75,7 +75,6 @@ export function CreateCampaign({
   const [campaignName, setCampaignName] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [prospectCount, setProspectCount] = useState(0);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [campaignToReview, setCampaignToReview] = useState<Campaign | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,28 +85,42 @@ export function CreateCampaign({
     setCampaignName('');
     setExcelFile(null);
     setPdfFile(null);
-    setProspectCount(0);
     setLastError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!excelFile || !pdfFile || prospectCount <= 0) {
-      setLastError('Bitte alle benötigten Dateien hochladen und Prospect-Anzahl angeben.');
+    if (!excelFile || !pdfFile) {
+      setLastError('Bitte alle benötigten Dateien hochladen.');
       return;
     }
 
-    const requiredCredits = 49 + prospectCount;
-    if (credits < requiredCredits) {
-      setLastError(`Nicht genügend Credits. Benötigt: ${requiredCredits}, verfügbar: ${credits}.`);
+    // Validate Excel file
+    const excelValidation = validateExcelFile(excelFile);
+    if (!excelValidation.valid) {
+      setLastError(excelValidation.error || 'Ungültige Excel-Datei');
       return;
     }
+
+    // Validate PDF file
+    const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10MB
+    if (pdfFile.size > MAX_PDF_SIZE) {
+      setLastError(`PDF-Größe überschreitet das Maximum von ${MAX_PDF_SIZE / 1024 / 1024}MB`);
+      return;
+    }
+    if (!pdfFile.name.toLowerCase().endsWith('.pdf')) {
+      setLastError('PDF-Datei muss eine .pdf Datei sein');
+      return;
+    }
+
+    // Note: Prospect count will be calculated from Excel file during campaign creation
+    // We can't pre-validate credit requirements without parsing the file first
+    // The backend will handle credit validation
 
     const payload: CreateCampaignFormValues = {
       name: campaignName || 'Neue Kampagne',
       excelFile,
-      pdfFile,
-      prospectCount
+      pdfFile
     };
 
     try {
@@ -362,21 +375,6 @@ export function CreateCampaign({
             />
           </div>
 
-          {/* Prospect Count */}
-          <div>
-            <Label htmlFor="prospect-count">Anzahl Prospects *</Label>
-            <Input
-              id="prospect-count"
-              type="number"
-              min={1}
-              placeholder="z.B. 50"
-              value={prospectCount ? prospectCount : ''}
-              onChange={(e) => setProspectCount(Number(e.target.value))}
-              className="mt-2"
-              required
-            />
-          </div>
-
           {/* Excel Upload */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -474,7 +472,7 @@ export function CreateCampaign({
             <Button
               type="submit"
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={isSubmitting || !campaignName || !excelFile || !pdfFile || prospectCount <= 0}
+              disabled={isSubmitting || !campaignName || !excelFile || !pdfFile}
             >
               {isSubmitting ? (
                 <>

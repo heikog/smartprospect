@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from './ui/button';
-import { Sparkles, Plus, LogOut } from 'lucide-react';
+import { Sparkles, Plus, LogOut, History } from 'lucide-react';
 import { CampaignList } from './CampaignList';
 import { CreateCampaign } from './CreateCampaign';
 import { CampaignDetail } from './CampaignDetail';
 import { createCampaign, listCampaigns, updateCampaignStatus, type CampaignRecord } from '../services/campaigns';
 import { useAuth } from '../contexts/AuthContext';
+import { startCampaignGeneration, approveCampaign, dispatchCampaign } from '../services/api';
+import { CreditLedgerDialog } from './CreditLedgerDialog';
 
 export type CampaignStatus =
   | 'created'
@@ -29,7 +31,6 @@ export type Campaign = {
   dispatchedAt?: string;
 };
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const mapCampaignRecord = (record: CampaignRecord): Campaign => ({
   id: record.id,
@@ -49,6 +50,7 @@ export function Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [ledgerDialogOpen, setLedgerDialogOpen] = useState(false);
 
   const refreshCampaigns = useCallback(async () => {
     if (!profile?.id) return;
@@ -87,13 +89,13 @@ export function Dashboard() {
   }, []);
 
   const handleCreateCampaign = useCallback(
-    async (payload: { name: string; excelFile: File; pdfFile: File; prospectCount: number }) => {
+    async (payload: { name: string; excelFile: File; pdfFile: File }) => {
       if (!profile?.id) return;
       try {
         const record = await createCampaign({
           name: payload.name,
-          servicePdfPath: `campaigns/demo/${payload.pdfFile.name}`,
-          totalProspects: payload.prospectCount,
+          excelFile: payload.excelFile,
+          pdfFile: payload.pdfFile,
           ownerId: profile.id
         });
         const mapped = mapCampaignRecord(record);
@@ -115,15 +117,17 @@ export function Dashboard() {
       updateLocalCampaign(campaign.id, { status: 'generating', progress: 15, lastError: undefined });
       try {
         await updateCampaignStatus({ campaignId: campaign.id, status: 'generating' });
-        await delay(600);
-        updateLocalCampaign(campaign.id, { status: 'generated', progress: 100 });
-        await updateCampaignStatus({ campaignId: campaign.id, status: 'generated' });
+        // Call edge function to trigger n8n workflow
+        await startCampaignGeneration(campaign.id);
+        // Note: Status will be updated by n8n workflow via webhook
+        // We don't set it to 'generated' here - that's done by the backend
       } catch (error) {
-        console.error('Fehler beim Aktualisieren des Kampagnenstatus', error);
+        console.error('Fehler beim Starten der Generierung', error);
         updateLocalCampaign(campaign.id, {
           status: 'generation_failed',
-          lastError: 'Generierung fehlgeschlagen. Bitte erneut versuchen.'
+          lastError: error instanceof Error ? error.message : 'Generierung fehlgeschlagen. Bitte erneut versuchen.'
         });
+        await updateCampaignStatus({ campaignId: campaign.id, status: 'generation_failed', fields: { last_error: error instanceof Error ? error.message : 'Generierung fehlgeschlagen' } });
       }
     },
     [updateLocalCampaign]
@@ -153,7 +157,8 @@ export function Dashboard() {
     async (campaign: Campaign) => {
       updateLocalCampaign(campaign.id, { status: 'approved' });
       try {
-        await updateCampaignStatus({ campaignId: campaign.id, status: 'approved', fields: { approved_at: new Date().toISOString() } });
+        await approveCampaign(campaign.id);
+        await refreshCampaigns();
       } catch (error) {
         console.error('Fehler beim Freigeben der Kampagne', error);
         await refreshCampaigns();
@@ -177,14 +182,11 @@ export function Dashboard() {
 
   const handleDispatchCampaign = useCallback(
     async (campaign: Campaign) => {
-      const dispatchedAt = new Date().toISOString();
-      updateLocalCampaign(campaign.id, { status: 'dispatched', dispatchedAt });
+      updateLocalCampaign(campaign.id, { status: 'dispatched' });
       try {
-        await updateCampaignStatus({
-          campaignId: campaign.id,
-          status: 'dispatched',
-          fields: { dispatched_at: dispatchedAt }
-        });
+        await dispatchCampaign(campaign.id);
+        // Status will be updated by n8n workflow
+        await refreshCampaigns();
       } catch (error) {
         console.error('Fehler beim Abschließen des Versands', error);
         await refreshCampaigns();
@@ -234,6 +236,10 @@ export function Dashboard() {
             <div className="text-sm text-slate-600">
               Credits: <span className="font-semibold text-slate-900">{profile?.credits ?? 0}</span>
             </div>
+            <Button variant="ghost" size="sm" onClick={() => setLedgerDialogOpen(true)}>
+              <History className="w-4 h-4 mr-2" />
+              Historie
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setView('list')}>
               Meine Kampagnen
             </Button>
@@ -288,6 +294,8 @@ export function Dashboard() {
           <CampaignDetail campaign={selectedCampaign} onBack={handleBackToList} />
         )}
       </main>
+
+      <CreditLedgerDialog open={ledgerDialogOpen} onOpenChange={setLedgerDialogOpen} />
     </div>
   );
 }

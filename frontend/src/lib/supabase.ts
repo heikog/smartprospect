@@ -4,7 +4,7 @@ import { env } from './env';
 
 export const supabase = createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
   auth: {
-    persistSession: false
+    persistSession: true
   }
 });
 
