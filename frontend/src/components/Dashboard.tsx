@@ -5,6 +5,7 @@ import { CampaignList } from './CampaignList';
 import { CreateCampaign } from './CreateCampaign';
 import { CampaignDetail } from './CampaignDetail';
 import { createCampaign, listCampaigns, updateCampaignStatus, type CampaignRecord } from '../services/campaigns';
+import { useAuth } from '../contexts/AuthContext';
 
 export type CampaignStatus =
   | 'created'
@@ -28,33 +29,6 @@ export type Campaign = {
   dispatchedAt?: string;
 };
 
-const fallbackCampaigns: Campaign[] = [
-  {
-    id: 'camp-001',
-    name: 'Q1 Tech Startups Berlin',
-    status: 'ready_for_review',
-    createdAt: '2025-10-29T08:15:00.000Z',
-    prospectCount: 47,
-    progress: 100
-  },
-  {
-    id: 'camp-002',
-    name: 'Mittelstand Bayern - Software',
-    status: 'generating',
-    createdAt: '2025-10-30T10:12:00.000Z',
-    prospectCount: 152,
-    progress: 67
-  },
-  {
-    id: 'camp-003',
-    name: 'Enterprise DACH',
-    status: 'ready_for_dispatch',
-    createdAt: '2025-10-24T13:45:00.000Z',
-    prospectCount: 23,
-    progress: 100
-  }
-];
-
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const mapCampaignRecord = (record: CampaignRecord): Campaign => ({
@@ -69,33 +43,34 @@ const mapCampaignRecord = (record: CampaignRecord): Campaign => ({
 });
 
 export function Dashboard() {
-  const [view, setView] = useState<'list' | 'create' | 'detail'>('create');
+  const { profile, signOut, refreshProfile } = useAuth();
+  const [view, setView] = useState<'list' | 'create' | 'detail'>('list');
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [credits] = useState(50);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(fallbackCampaigns);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshCampaigns = useCallback(async () => {
+    if (!profile?.id) return;
     try {
-      const data = await listCampaigns();
-      if (data.length === 0) {
-        setCampaigns(fallbackCampaigns);
-        return;
-      }
+      setIsLoading(true);
+      const data = await listCampaigns(profile.id);
       setCampaigns(data.map(mapCampaignRecord));
+      setLoadError(null);
     } catch (error) {
       console.error('Fehler beim Laden der Kampagnen', error);
-      setLoadError('Kampagnen konnten nicht von Supabase geladen werden. Demo-Daten werden angezeigt.');
-      setCampaigns(fallbackCampaigns);
+      setLoadError('Kampagnen konnten nicht geladen werden. Bitte später erneut versuchen.');
+      setCampaigns([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [profile?.id]);
 
   useEffect(() => {
-    refreshCampaigns();
-  }, [refreshCampaigns]);
+    if (profile?.id) {
+      refreshCampaigns();
+    }
+  }, [profile?.id, refreshCampaigns]);
 
   useEffect(() => {
     if (!selectedCampaign) return;
@@ -113,32 +88,26 @@ export function Dashboard() {
 
   const handleCreateCampaign = useCallback(
     async (payload: { name: string; excelFile: File; pdfFile: File; prospectCount: number }) => {
+      if (!profile?.id) return;
       try {
         const record = await createCampaign({
           name: payload.name,
           servicePdfPath: `campaigns/demo/${payload.pdfFile.name}`,
-          totalProspects: payload.prospectCount
+          totalProspects: payload.prospectCount,
+          ownerId: profile.id
         });
         const mapped = mapCampaignRecord(record);
         setCampaigns((prev) => [mapped, ...prev]);
+        await refreshProfile();
+        setLoadError(null);
       } catch (error) {
         console.error('Kampagne konnte nicht angelegt werden', error);
-        const fallback: Campaign = {
-          id: `local-${Date.now()}`,
-          name: payload.name,
-          status: 'created',
-          createdAt: new Date().toISOString(),
-          prospectCount: payload.prospectCount,
-          progress: 0,
-          lastError: 'Offline-Demo: Kampagne nur lokal gespeichert.'
-        };
-        setCampaigns((prev) => [fallback, ...prev]);
-        setLoadError('Kampagne konnte nicht in Supabase angelegt werden. Demo-Eintrag erstellt.');
+        setLoadError('Kampagne konnte nicht angelegt werden. Bitte Credits prüfen oder erneut versuchen.');
       } finally {
         setView('list');
       }
     },
-    []
+    [profile?.id, refreshProfile]
   );
 
   const handleStartGeneration = useCallback(
@@ -237,8 +206,17 @@ export function Dashboard() {
   const headerSubtitle = useMemo(() => {
     if (isLoading) return 'Lade Kampagnen …';
     if (loadError) return loadError;
+    if (campaigns.length === 0) return 'Noch keine Kampagnen angelegt';
     return 'Verwalten Sie Ihre Multichannel-Outreach-Kampagnen';
-  }, [isLoading, loadError]);
+  }, [isLoading, loadError, campaigns.length]);
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+        Lade Profil …
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -253,10 +231,13 @@ export function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
+            <div className="text-sm text-slate-600">
+              Credits: <span className="font-semibold text-slate-900">{profile?.credits ?? 0}</span>
+            </div>
             <Button variant="ghost" size="sm" onClick={() => setView('list')}>
               Meine Kampagnen
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={signOut}>
               <LogOut className="w-4 h-4 mr-2" />
               Abmelden
             </Button>
@@ -278,8 +259,11 @@ export function Dashboard() {
                 Neue Kampagne
               </Button>
             </div>
-
-            <CampaignList campaigns={campaigns} onSelect={handleSelectCampaign} />
+            {isLoading ? (
+              <div className="py-16 text-center text-slate-500">Kampagnen werden geladen …</div>
+            ) : (
+              <CampaignList campaigns={campaigns} onSelect={handleSelectCampaign} />
+            )}
           </div>
         )}
 
@@ -287,8 +271,8 @@ export function Dashboard() {
           <CreateCampaign
             onCancel={() => setView('list')}
             onCreate={handleCreateCampaign}
-            credits={credits}
-            onBuyCredits={() => alert('Credits kaufen - Stripe Integration')}
+            credits={profile?.credits ?? 0}
+            onBuyCredits={() => alert('Stripe-Integration folgt.')} 
             campaigns={campaigns}
             onSelectCampaign={handleSelectCampaign}
             onStartGeneration={handleStartGeneration}
@@ -307,4 +291,3 @@ export function Dashboard() {
     </div>
   );
 }
-

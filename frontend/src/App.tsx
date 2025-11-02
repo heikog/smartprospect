@@ -1,18 +1,21 @@
-import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Dashboard } from './components/Dashboard';
 import { LandingPage } from './components/LandingPage';
 import { ProspectPreviewPage } from './pages/ProspectPreviewPage';
+import { SignInPage } from './pages/SignInPage';
+import { RequireAuth } from './components/RequireAuth';
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/auth" element={<SignInPage />} />
       <Route
-        path="/"
+        path="/dashboard"
         element={
-          isLoggedIn ? <Dashboard /> : <LandingPage onLogin={() => setIsLoggedIn(true)} />
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
         }
       />
       <Route path="/preview/:campaignId/:prospectId" element={<ProspectPreviewPage />} />
@@ -20,4 +23,3 @@ export default function App() {
     </Routes>
   );
 }
-

@@ -1,11 +1,16 @@
 import { Button } from './ui/button';
 import { Zap, Users, Globe, FileCheck, Mail, Sparkles } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-interface LandingPageProps {
-  onLogin: () => void;
-}
+export function LandingPage() {
+  const { session } = useAuth();
+  const navigate = useNavigate();
 
-export function LandingPage({ onLogin }: LandingPageProps) {
+  const handlePrimaryCta = () => {
+    navigate(session ? '/dashboard' : '/auth');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
@@ -20,7 +25,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
           <div className="flex items-center gap-4">
             <Button variant="ghost">Preise</Button>
             <Button variant="ghost">Features</Button>
-            <Button onClick={onLogin}>Anmelden</Button>
+            <Button onClick={handlePrimaryCta}>{session ? 'Dashboard' : 'Anmelden'}</Button>
           </div>
         </div>
       </header>
@@ -43,7 +48,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
           </p>
 
           <div className="flex items-center justify-center gap-4 pt-4">
-            <Button size="lg" onClick={onLogin} className="bg-blue-600 hover:bg-blue-700">
+            <Button size="lg" onClick={handlePrimaryCta} className="bg-blue-600 hover:bg-blue-700">
               Kostenlos starten
             </Button>
             <Button size="lg" variant="outline">
@@ -137,7 +142,7 @@ export function LandingPage({ onLogin }: LandingPageProps) {
           <p className="text-xl mb-8 text-blue-50">
             Erstellen Sie in 5 Minuten eine vollständig personalisierte Multichannel-Kampagne
           </p>
-          <Button size="lg" variant="secondary" onClick={onLogin}>
+          <Button size="lg" variant="secondary" onClick={handlePrimaryCta}>
             Jetzt kostenlos starten
           </Button>
         </div>

@@ -75,6 +75,7 @@ export function CreateCampaign({
   const [campaignName, setCampaignName] = useState('');
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [prospectCount, setProspectCount] = useState(0);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [campaignToReview, setCampaignToReview] = useState<Campaign | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,18 +86,28 @@ export function CreateCampaign({
     setCampaignName('');
     setExcelFile(null);
     setPdfFile(null);
+    setProspectCount(0);
     setLastError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!excelFile || !pdfFile) return;
+    if (!excelFile || !pdfFile || prospectCount <= 0) {
+      setLastError('Bitte alle benötigten Dateien hochladen und Prospect-Anzahl angeben.');
+      return;
+    }
+
+    const requiredCredits = 49 + prospectCount;
+    if (credits < requiredCredits) {
+      setLastError(`Nicht genügend Credits. Benötigt: ${requiredCredits}, verfügbar: ${credits}.`);
+      return;
+    }
 
     const payload: CreateCampaignFormValues = {
       name: campaignName || 'Neue Kampagne',
       excelFile,
       pdfFile,
-      prospectCount: Math.floor(Math.random() * 100) + 20
+      prospectCount
     };
 
     try {
@@ -351,6 +362,21 @@ export function CreateCampaign({
             />
           </div>
 
+          {/* Prospect Count */}
+          <div>
+            <Label htmlFor="prospect-count">Anzahl Prospects *</Label>
+            <Input
+              id="prospect-count"
+              type="number"
+              min={1}
+              placeholder="z.B. 50"
+              value={prospectCount ? prospectCount : ''}
+              onChange={(e) => setProspectCount(Number(e.target.value))}
+              className="mt-2"
+              required
+            />
+          </div>
+
           {/* Excel Upload */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -448,7 +474,7 @@ export function CreateCampaign({
             <Button
               type="submit"
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={isSubmitting || !campaignName || !excelFile || !pdfFile}
+              disabled={isSubmitting || !campaignName || !excelFile || !pdfFile || prospectCount <= 0}
             >
               {isSubmitting ? (
                 <>
@@ -539,4 +565,3 @@ export function CreateCampaign({
     </div>
   );
 }
-

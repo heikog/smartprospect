@@ -19,6 +19,7 @@ DROP TABLE IF EXISTS public.prospects CASCADE;
 DROP TABLE IF EXISTS public.campaigns CASCADE;
 DROP TABLE IF EXISTS public.credit_ledger CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
 
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP FUNCTION IF EXISTS public.deduct_campaign_credits(uuid, uuid, integer, text, jsonb) CASCADE;
@@ -295,6 +296,60 @@ BEGIN
     p_reason,
     coalesce(p_meta, '{}'::jsonb) || jsonb_build_object('campaign_id', p_campaign_id)
   );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_campaign_with_cost(
+  p_owner_id uuid,
+  p_name text,
+  p_service_pdf_path text,
+  p_total_prospects integer
+) RETURNS public.campaigns
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_campaign public.campaigns;
+  v_total_cost integer;
+BEGIN
+  IF p_total_prospects IS NULL OR p_total_prospects < 0 THEN
+    RAISE EXCEPTION 'invalid_prospect_count';
+  END IF;
+
+  v_total_cost := 49 + p_total_prospects; -- Basispreis 49 + 1 pro Prospect
+
+  INSERT INTO public.campaigns (
+    owner_id,
+    name,
+    service_pdf_path,
+    total_prospects,
+    status,
+    credit_cost
+  ) VALUES (
+    p_owner_id,
+    p_name,
+    p_service_pdf_path,
+    p_total_prospects,
+    'created',
+    0
+  )
+  RETURNING * INTO v_campaign;
+
+  BEGIN
+    PERFORM public.deduct_campaign_credits(
+      p_owner_id,
+      v_campaign.id,
+      v_total_cost,
+      'campaign_charge',
+      jsonb_build_object('prospects', p_total_prospects)
+    );
+  EXCEPTION WHEN others THEN
+    DELETE FROM public.campaigns WHERE id = v_campaign.id;
+    RAISE;
+  END;
+
+  RETURN (SELECT * FROM public.campaigns WHERE id = v_campaign.id);
 END;
 $$;
 

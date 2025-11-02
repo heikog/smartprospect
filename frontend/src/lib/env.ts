@@ -13,5 +13,6 @@ function readEnv(key: RequiredEnvKey): string {
 export const env = {
   supabaseUrl: readEnv('VITE_SUPABASE_URL'),
   supabaseAnonKey: readEnv('VITE_SUPABASE_ANON_KEY'),
-  demoOwnerId: import.meta.env.VITE_DEMO_OWNER_ID ?? null
+  demoOwnerId: import.meta.env.VITE_DEMO_OWNER_ID ?? null,
+  appUrl: import.meta.env.VITE_APP_URL ?? (typeof window !== 'undefined' ? window.location.origin : '')
 };
