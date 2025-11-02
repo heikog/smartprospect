@@ -6,6 +6,10 @@ frontend/.env.*
 .env
 !.env.example
 
+# Deployment configuration (contains secrets)
+.deploy-config
+!.deploy-config.example
+
 # Build outputs
 frontend/build
 node_modules
