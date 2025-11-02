@@ -178,4 +178,3 @@ export function useAuth() {
 }
 
 export type { Profile };
-*** End Patch
