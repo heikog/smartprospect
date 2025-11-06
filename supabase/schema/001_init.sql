@@ -19,14 +19,16 @@ DROP TABLE IF EXISTS public.prospects CASCADE;
 DROP TABLE IF EXISTS public.campaigns CASCADE;
 DROP TABLE IF EXISTS public.credit_ledger CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP TABLE IF EXISTS public.users CASCADE;
+
+DROP TRIGGER IF EXISTS trg_handle_new_user ON auth.users;
 
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.add_profile_credits(uuid, integer, text, jsonb) CASCADE;
 DROP FUNCTION IF EXISTS public.deduct_campaign_credits(uuid, uuid, integer, text, jsonb) CASCADE;
 DROP FUNCTION IF EXISTS public.refund_campaign(uuid, uuid, integer, text, jsonb) CASCADE;
+DROP FUNCTION IF EXISTS public.create_campaign_with_cost(uuid, text, text, integer) CASCADE;
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS public.log_campaign_status_change() CASCADE;
-DROP TRIGGER IF EXISTS trg_log_campaign_status_change ON public.campaigns CASCADE;
 
 DROP TYPE IF EXISTS public.campaign_status CASCADE;
 DROP TYPE IF EXISTS public.prospect_status CASCADE;
@@ -136,6 +138,8 @@ CREATE TABLE public.prospects (
   stadt text NOT NULL,
   asset_status prospect_status NOT NULL DEFAULT 'creating',
   asset_paths jsonb NOT NULL DEFAULT '{}'::jsonb,
+  avatar_embed_url text,
+  presentation_embed_url text,
   landing_slug text,
   landing_page_path text,
   pdf_path text,
@@ -172,8 +176,38 @@ CREATE TABLE public.campaign_events (
 CREATE INDEX campaign_events_campaign_idx ON public.campaign_events (campaign_id, created_at DESC);
 
 -- -----------------------------------------------------------------------
--- Functions for Business Logic
+-- Business Logic Functions
 -- -----------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.add_profile_credits(
+  p_profile_id uuid,
+  p_amount integer,
+  p_reason text DEFAULT 'credit_topup',
+  p_meta jsonb DEFAULT '{}'::jsonb
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_amount <= 0 THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.profiles
+  SET credits = credits + p_amount,
+      updated_at = timezone('utc', now())
+  WHERE id = p_profile_id AND deleted_at IS NULL;
+
+  INSERT INTO public.credit_ledger (profile_id, change, reason, meta)
+  VALUES (
+    p_profile_id,
+    p_amount,
+    COALESCE(p_reason, 'credit_topup'),
+    coalesce(p_meta, '{}'::jsonb)
+  );
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -197,13 +231,7 @@ BEGIN
     SELECT 1 FROM public.credit_ledger
     WHERE profile_id = NEW.id AND reason = 'signup_bonus'
   ) THEN
-    UPDATE public.profiles
-    SET credits = credits + initial_credits,
-        updated_at = timezone('utc', now())
-    WHERE id = NEW.id;
-
-    INSERT INTO public.credit_ledger (profile_id, change, reason, meta)
-    VALUES (
+    PERFORM public.add_profile_credits(
       NEW.id,
       initial_credits,
       'signup_bonus',
@@ -259,7 +287,7 @@ BEGIN
   VALUES (
     p_profile_id,
     -p_total_cost,
-    p_reason,
+    COALESCE(p_reason, 'campaign_charge'),
     coalesce(p_meta, '{}'::jsonb) || jsonb_build_object('campaign_id', p_campaign_id)
   );
 
@@ -295,7 +323,7 @@ BEGIN
   VALUES (
     p_profile_id,
     p_total_refund,
-    p_reason,
+    COALESCE(p_reason, 'campaign_refund'),
     coalesce(p_meta, '{}'::jsonb) || jsonb_build_object('campaign_id', p_campaign_id)
   );
 END;
@@ -319,7 +347,7 @@ BEGIN
     RAISE EXCEPTION 'invalid_prospect_count';
   END IF;
 
-  v_total_cost := 49 + p_total_prospects; -- Basispreis 49 + 1 pro Prospect
+  v_total_cost := 49 + p_total_prospects;
 
   INSERT INTO public.campaigns (
     owner_id,
@@ -351,7 +379,6 @@ BEGIN
     RAISE;
   END;
 
-  -- Log campaign creation event
   INSERT INTO public.campaign_events (campaign_id, profile_id, event_type, message, payload)
   VALUES (
     v_campaign.id,
@@ -365,9 +392,6 @@ BEGIN
 END;
 $$;
 
--- -----------------------------------------------------------------------
--- Trigger to log campaign status changes
--- -----------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.log_campaign_status_change()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -409,50 +433,50 @@ ALTER TABLE public.prospects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaign_events ENABLE ROW LEVEL SECURITY;
 
 -- Profiles
-CREATE POLICY "profiles_select_self"
+CREATE POLICY profiles_select_self
 ON public.profiles
 FOR SELECT
 USING (auth.uid() = id AND deleted_at IS NULL);
 
-CREATE POLICY "profiles_update_self"
+CREATE POLICY profiles_update_self
 ON public.profiles
 FOR UPDATE
 USING (auth.uid() = id AND deleted_at IS NULL)
 WITH CHECK (auth.uid() = id AND deleted_at IS NULL);
 
-CREATE POLICY "profiles_service_role"
+CREATE POLICY profiles_service_role
 ON public.profiles
 FOR ALL
 USING (auth.role() = 'service_role')
 WITH CHECK (auth.role() = 'service_role');
 
 -- Credit ledger
-CREATE POLICY "credit_ledger_select_self"
+CREATE POLICY credit_ledger_select_self
 ON public.credit_ledger
 FOR SELECT
 USING (profile_id = auth.uid() AND deleted_at IS NULL);
 
-CREATE POLICY "credit_ledger_service_role"
+CREATE POLICY credit_ledger_service_role
 ON public.credit_ledger
 FOR ALL
 USING (auth.role() = 'service_role')
 WITH CHECK (auth.role() = 'service_role');
 
 -- Campaigns
-CREATE POLICY "campaigns_owner_access"
+CREATE POLICY campaigns_owner_access
 ON public.campaigns
 FOR ALL
 USING (deleted_at IS NULL AND owner_id = auth.uid())
 WITH CHECK (deleted_at IS NULL AND owner_id = auth.uid());
 
-CREATE POLICY "campaigns_service_role"
+CREATE POLICY campaigns_service_role
 ON public.campaigns
 FOR ALL
 USING (auth.role() = 'service_role')
 WITH CHECK (auth.role() = 'service_role');
 
 -- Prospects
-CREATE POLICY "prospects_owner_access"
+CREATE POLICY prospects_owner_access
 ON public.prospects
 FOR ALL
 USING (
@@ -476,14 +500,14 @@ WITH CHECK (
   )
 );
 
-CREATE POLICY "prospects_service_role"
+CREATE POLICY prospects_service_role
 ON public.prospects
 FOR ALL
 USING (auth.role() = 'service_role')
 WITH CHECK (auth.role() = 'service_role');
 
 -- Campaign events
-CREATE POLICY "campaign_events_owner_access"
+CREATE POLICY campaign_events_owner_access
 ON public.campaign_events
 FOR SELECT
 USING (
@@ -497,7 +521,7 @@ USING (
   )
 );
 
-CREATE POLICY "campaign_events_service_role"
+CREATE POLICY campaign_events_service_role
 ON public.campaign_events
 FOR ALL
 USING (auth.role() = 'service_role')
@@ -514,6 +538,8 @@ SELECT
   p.landing_page_path,
   p.pdf_path,
   p.asset_paths,
+  p.avatar_embed_url,
+  p.presentation_embed_url,
   p.vorname,
   p.nachname,
   p.anrede,

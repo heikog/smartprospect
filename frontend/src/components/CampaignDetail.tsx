@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ArrowLeft, Download, Send, CheckCircle, FileText, Globe } from 'lucide-react';
+import { ArrowLeft, Download, Send, CheckCircle, FileText, Globe, MonitorPlay, BarChart3 } from 'lucide-react';
 import { Campaign } from './Dashboard';
 import { ProspectTable } from './ProspectTable';
 import { AssetPreview } from './AssetPreview';
@@ -90,6 +90,8 @@ export function CampaignDetail({ campaign, onBack }: CampaignDetailProps) {
               <h3 className="mb-4">Generierte Asset-Typen</h3>
               <div className="space-y-3">
                 <AssetTypeRow icon={<FileText className="w-5 h-5" />} label="Druckfertige PDF-Mailings" count={campaign.prospectCount} />
+                <AssetTypeRow icon={<MonitorPlay className="w-5 h-5" />} label="Heygen Avatar-Embed" count={campaign.prospectCount} />
+                <AssetTypeRow icon={<BarChart3 className="w-5 h-5" />} label="Gamma Präsentation" count={campaign.prospectCount} />
                 <AssetTypeRow icon={<Globe className="w-5 h-5" />} label="Landingpages" count={campaign.prospectCount} />
               </div>
             </Card>
@@ -102,10 +104,8 @@ export function CampaignDetail({ campaign, onBack }: CampaignDetailProps) {
 ├── meta.json
 ├── campaign-data.xlsx (inkl. Links)
 ├── service-flyer.pdf
+├── embeds.json (Heygen & Gamma URLs)
 ├── /prospect-001/
-│   ├── video.mp4 (Heygen)
-│   ├── audio.mp3 (ElevenLabs)
-│   ├── presentation.pdf (Gamma)
 │   ├── flyer.pdf
 │   └── landingpage.html
 ├── /prospect-002/
@@ -145,7 +145,35 @@ export function CampaignDetail({ campaign, onBack }: CampaignDetailProps) {
                 <div className="space-y-2">
                   <h3 className="text-lg">Landingpage</h3>
                   <p className="text-sm text-slate-600">
-                    Dynamische Route <code>/preview/[campaignId]/[prospectId]</code> lädt Inhalte direkt aus Supabase Storage.
+                    Dynamische Route <code>/preview/[campaignId]/[prospectId]</code> lädt Inhalte direkt aus der Kampagnenplattform – inklusive Heygen- und Gamma-Embeds.
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <MonitorPlay className="w-7 h-7" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg">Avatar-Video</h3>
+                  <p className="text-sm text-slate-600">
+                    Heygen stellt einen Embed-Link bereit – kein Download nötig. Der Link wird in{' '}
+                    <code>prospects.avatar_embed_url</code> gespeichert und direkt eingebettet.
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                  <BarChart3 className="w-7 h-7" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg">Präsentation</h3>
+                  <p className="text-sm text-slate-600">
+                    Gamma-Decks werden über <code>prospects.presentation_embed_url</code> eingebettet – immer in der aktuellen
+                    Version.
                   </p>
                 </div>
               </div>

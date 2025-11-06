@@ -101,6 +101,8 @@ export interface Database {
           stadt: string;
           asset_status: Database['public']['Enums']['prospect_status'];
           asset_paths: Json;
+          avatar_embed_url: string | null;
+          presentation_embed_url: string | null;
           landing_slug: string | null;
           landing_page_path: string | null;
           pdf_path: string | null;
@@ -128,6 +130,8 @@ export interface Database {
           stadt: string;
           asset_status?: Database['public']['Enums']['prospect_status'];
           asset_paths?: Json;
+          avatar_embed_url?: string | null;
+          presentation_embed_url?: string | null;
           landing_slug?: string | null;
           landing_page_path?: string | null;
           pdf_path?: string | null;

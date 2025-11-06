@@ -49,15 +49,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (hasWindow) {
           const url = new URL(window.location.href);
 
-          // Magic link via hash fragment
-          if (url.hash.includes('access_token')) {
-            const { error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+          if (url.searchParams.has('code')) {
+            // New PKCE-style magic link (?code=...&type=signup|magiclink)
+            const { data, error } = await supabase.auth.exchangeCodeForSession({
+              storeSession: true
+            });
             if (error) {
-              console.error('Magic link exchange failed', error);
+              console.error('Magic link code exchange failed', error);
             } else {
+              if (data?.session) {
+                setSession(data.session);
+                const profileData = await fetchProfile(data.session.user.id);
+                setProfile(profileData);
+              }
               window.localStorage.removeItem(MAGIC_EMAIL_STORAGE_KEY);
             }
-            url.hash = '';
+            url.searchParams.delete('code');
+            url.searchParams.delete('type');
             window.history.replaceState({}, document.title, url.toString());
           } else {
             // Magic link via verify endpoint (?token=...&type=magiclink)

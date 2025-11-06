@@ -7,6 +7,7 @@ import { CampaignDetail } from './CampaignDetail';
 import { createCampaign, listCampaigns, updateCampaignStatus, type CampaignRecord } from '../services/campaigns';
 import { useAuth } from '../contexts/AuthContext';
 import { startCampaignGeneration, approveCampaign, dispatchCampaign } from '../services/api';
+import { startCreditCheckout } from '../services/billing';
 import { CreditLedgerDialog } from './CreditLedgerDialog';
 
 export type CampaignStatus =
@@ -73,6 +74,21 @@ export function Dashboard() {
       refreshCampaigns();
     }
   }, [profile?.id, refreshCampaigns]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const currentUrl = new URL(window.location.href);
+    const checkoutStatus = currentUrl.searchParams.get('checkout');
+    if (!checkoutStatus) return;
+
+    currentUrl.searchParams.delete('checkout');
+    window.history.replaceState({}, document.title, currentUrl.toString());
+
+    if (checkoutStatus === 'success') {
+      refreshProfile();
+      refreshCampaigns();
+    }
+  }, [refreshCampaigns, refreshProfile]);
 
   useEffect(() => {
     if (!selectedCampaign) return;
@@ -205,6 +221,11 @@ export function Dashboard() {
     setSelectedCampaign(null);
   };
 
+  const handleBuyCredits = useCallback(async () => {
+    const { url } = await startCreditCheckout('credits_100');
+    window.location.href = url;
+  }, []);
+
   const headerSubtitle = useMemo(() => {
     if (isLoading) return 'Lade Kampagnen …';
     if (loadError) return loadError;
@@ -278,7 +299,7 @@ export function Dashboard() {
             onCancel={() => setView('list')}
             onCreate={handleCreateCampaign}
             credits={profile?.credits ?? 0}
-            onBuyCredits={() => alert('Stripe-Integration folgt.')} 
+            onBuyCredits={handleBuyCredits}
             campaigns={campaigns}
             onSelectCampaign={handleSelectCampaign}
             onStartGeneration={handleStartGeneration}

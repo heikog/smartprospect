@@ -13,6 +13,8 @@ export interface ProspectData {
   nachname: string;
   stadt: string;
   url: string;
+  avatarEmbedUrl?: string | null;
+  presentationEmbedUrl?: string | null;
 }
 
 interface ProspectLandingPageProps {
@@ -50,6 +52,8 @@ export function ProspectLandingExperience({ prospect }: { prospect: ProspectData
   const [phone, setPhone] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [audioPlaying, setAudioPlaying] = useState(false);
+  const avatarEmbedUrl = prospect.avatarEmbedUrl ?? null;
+  const presentationEmbedUrl = prospect.presentationEmbedUrl ?? null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,52 +97,58 @@ export function ProspectLandingExperience({ prospect }: { prospect: ProspectData
         {/* Avatar Video Section */}
         <Card className="p-8 mb-12 bg-slate-50">
           <h3 className="text-2xl mb-4 text-slate-900">Persönliche Begrüßung für Sie</h3>
-          <div className="aspect-video bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg relative overflow-hidden group">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-24 h-24 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mb-4 mx-auto group-hover:bg-white/30 transition-colors cursor-pointer">
-                  <Play className="w-12 h-12 text-white ml-2" />
+          <div className="aspect-video rounded-lg overflow-hidden bg-slate-900 relative">
+            {avatarEmbedUrl ? (
+              <iframe
+                src={avatarEmbedUrl}
+                title="HeyGen Avatar Video"
+                className="w-full h-full border-0"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center text-white space-y-2">
+                  <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto">
+                    <Play className="w-10 h-10 text-white ml-1" />
+                  </div>
+                  <p className="text-sm">Avatar Video wird gerade vorbereitet …</p>
+                  <p className="text-xs text-white/60">
+                    Speziell für {prospect.vorname} {prospect.nachname} erstellt
+                  </p>
                 </div>
-                <p className="text-white text-sm">Avatar Video abspielen</p>
-                <p className="text-white/60 text-xs mt-2">
-                  Speziell für {prospect.vorname} {prospect.nachname} erstellt
-                </p>
               </div>
-            </div>
-            <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1 rounded text-sm">2:34</div>
+            )}
           </div>
-          <p className="text-sm text-slate-600 mt-4 text-center">🎬 Personalisiertes Avatar-Video mit Heygen erstellt</p>
+          <p className="text-sm text-slate-600 mt-4 text-center">
+            🎬 Personalisiertes Avatar-Video {avatarEmbedUrl ? 'direkt via Heygen eingebettet' : 'mit Heygen – Link folgt in Kürze'}
+          </p>
         </Card>
 
         {/* Presentation Section */}
         <Card className="p-8 mb-12">
           <h3 className="text-2xl mb-4 text-slate-900">Ihre individuelle Präsentation</h3>
-          <div className="aspect-[16/10] bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg relative overflow-hidden">
-            <div className="absolute inset-0 p-8">
-              <div className="bg-white rounded-lg shadow-2xl h-full p-8 flex flex-col">
-                <div className="mb-4">
-                  <div className="h-3 bg-blue-600 rounded w-3/4 mb-3" />
-                  <div className="h-2 bg-slate-200 rounded w-full mb-2" />
-                  <div className="h-2 bg-slate-200 rounded w-5/6" />
-                </div>
-                <div className="flex-1 grid grid-cols-2 gap-4 mt-4">
-                  <div className="bg-slate-100 rounded" />
-                  <div className="bg-slate-100 rounded" />
-                </div>
-                <div className="mt-4 flex justify-center gap-2">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-600' : 'bg-slate-300'}`} />
-                  ))}
-                </div>
+          <div className="aspect-[16/10] rounded-lg overflow-hidden bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center">
+            {presentationEmbedUrl ? (
+              <iframe
+                src={presentationEmbedUrl}
+                title="Gamma Präsentation"
+                className="w-full h-full border-0"
+                allow="fullscreen"
+                loading="lazy"
+              />
+            ) : (
+              <div className="text-center px-6 py-12 text-slate-600 space-y-3">
+                <p className="text-base font-medium">Die personalisierte Präsentation wird gerade generiert …</p>
+                <p className="text-sm">
+                  Sobald Gamma den Embed-Link bereitstellt, erscheint sie hier automatisch.
+                </p>
               </div>
-            </div>
+            )}
           </div>
-          <div className="mt-4 text-center">
-            <Button variant="outline" className="mr-2">
-              <Play className="w-4 h-4 mr-2" />
-              Präsentation ansehen
-            </Button>
-            <p className="text-sm text-slate-600 mt-3">📊 Mit Gamma.app für Ihr Unternehmen erstellt</p>
+          <div className="mt-4 text-center text-sm text-slate-600">
+            📊 Präsentation {presentationEmbedUrl ? 'live via Gamma eingebettet' : 'mit Gamma in Erstellung'}
           </div>
         </Card>
 
@@ -252,4 +262,3 @@ export function ProspectLandingExperience({ prospect }: { prospect: ProspectData
     </div>
   );
 }
-

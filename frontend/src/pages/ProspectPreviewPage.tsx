@@ -112,7 +112,9 @@ function mapProspect(record: NonNullable<Awaited<ReturnType<typeof getProspect>>
     vorname: record.vorname,
     nachname: record.nachname,
     stadt: record.stadt,
-    url: record.url
+    url: record.url,
+    avatarEmbedUrl: record.avatar_embed_url ?? null,
+    presentationEmbedUrl: record.presentation_embed_url ?? null
   };
 }
 
@@ -135,6 +137,8 @@ function createDemoProspect(prospectId: string): ProspectData {
     vorname: 'Demo',
     nachname: 'Kontakt',
     stadt: 'Berlin',
-    url: 'https://example.com'
+    url: 'https://example.com',
+    avatarEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation'
   };
 }

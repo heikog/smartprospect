@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { ExternalLink, Download, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { ExternalLink, Download, RefreshCcw, AlertTriangle, Play, FileText } from 'lucide-react';
 import { listProspects, type ProspectRecord } from '../services/campaigns';
 
 type ProspectStatus = 'creating' | 'ready' | 'error';
@@ -13,15 +13,62 @@ type ProspectRow = {
   company: string;
   status: ProspectStatus;
   pdfLink: string;
+  videoEmbedUrl: string | null;
+  presentationEmbedUrl: string | null;
   landingLink: string;
 };
 
 const fallbackProspects: ProspectRow[] = [
-  { id: '001', name: 'Max Mustermann', company: 'techsolutions.de', status: 'ready', pdfLink: '#', landingLink: '#' },
-  { id: '002', name: 'Anna Schmidt', company: 'digital-innovations.de', status: 'creating', pdfLink: '#', landingLink: '#' },
-  { id: '003', name: 'Thomas Weber', company: 'cloudsystems.com', status: 'ready', pdfLink: '#', landingLink: '#' },
-  { id: '004', name: 'Sarah Müller', company: 'analytics-pro.de', status: 'error', pdfLink: '#', landingLink: '#' },
-  { id: '005', name: 'Michael Fischer', company: 'automation.de', status: 'ready', pdfLink: '#', landingLink: '#' }
+  {
+    id: '001',
+    name: 'Max Mustermann',
+    company: 'techsolutions.de',
+    status: 'ready',
+    pdfLink: '#',
+    videoEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation',
+    landingLink: '#'
+  },
+  {
+    id: '002',
+    name: 'Anna Schmidt',
+    company: 'digital-innovations.de',
+    status: 'creating',
+    pdfLink: '#',
+    videoEmbedUrl: null,
+    presentationEmbedUrl: null,
+    landingLink: '#'
+  },
+  {
+    id: '003',
+    name: 'Thomas Weber',
+    company: 'cloudsystems.com',
+    status: 'ready',
+    pdfLink: '#',
+    videoEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation',
+    landingLink: '#'
+  },
+  {
+    id: '004',
+    name: 'Sarah Müller',
+    company: 'analytics-pro.de',
+    status: 'error',
+    pdfLink: '#',
+    videoEmbedUrl: null,
+    presentationEmbedUrl: null,
+    landingLink: '#'
+  },
+  {
+    id: '005',
+    name: 'Michael Fischer',
+    company: 'automation.de',
+    status: 'ready',
+    pdfLink: '#',
+    videoEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation',
+    landingLink: '#'
+  }
 ];
 
 interface ProspectTableProps {
@@ -133,14 +180,34 @@ export function ProspectTable({ campaignId }: ProspectTableProps) {
                       <RefreshCcw className="w-4 h-4 text-red-500" />
                     </Button>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => prospect.pdfLink !== '#' && window.open(prospect.pdfLink, '_blank')}
-                      disabled={prospect.pdfLink === '#'}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => prospect.videoEmbedUrl && window.open(prospect.videoEmbedUrl, '_blank', 'noopener')}
+                        disabled={!prospect.videoEmbedUrl}
+                      >
+                        <Play className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          prospect.presentationEmbedUrl && window.open(prospect.presentationEmbedUrl, '_blank', 'noopener')
+                        }
+                        disabled={!prospect.presentationEmbedUrl}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => prospect.pdfLink !== '#' && window.open(prospect.pdfLink, '_blank')}
+                        disabled={prospect.pdfLink === '#'}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </div>
                   )}
                 </TableCell>
               </TableRow>
@@ -165,6 +232,8 @@ function mapProspectRecord(record: ProspectRecord): ProspectRow {
     company: hostname,
     status: record.asset_status,
     pdfLink: record.pdf_path ?? '#',
+    videoEmbedUrl: record.avatar_embed_url ?? null,
+    presentationEmbedUrl: record.presentation_embed_url ?? null,
     landingLink: record.landing_page_path ?? '#'
   };
 }

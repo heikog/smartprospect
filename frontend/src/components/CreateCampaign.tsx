@@ -35,7 +35,7 @@ interface CreateCampaignProps {
   onCancel: () => void;
   onCreate: (payload: CreateCampaignFormValues) => Promise<void>;
   credits: number;
-  onBuyCredits: () => void;
+  onBuyCredits: () => Promise<void>;
   campaigns: Campaign[];
   onSelectCampaign: (campaign: Campaign) => void;
   onStartGeneration: (campaign: Campaign) => Promise<void>;
@@ -80,6 +80,7 @@ export function CreateCampaign({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [pendingCampaignId, setPendingCampaignId] = useState<string | null>(null);
+  const [isBuyingCredits, setIsBuyingCredits] = useState(false);
 
   const resetForm = () => {
     setCampaignName('');
@@ -176,6 +177,22 @@ export function CreateCampaign({
         return 'bg-red-100 text-red-700 border-red-200';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  const handleBuyCredits = async () => {
+    try {
+      setIsBuyingCredits(true);
+      await onBuyCredits();
+    } catch (error) {
+      console.error('Checkout konnte nicht gestartet werden', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Checkout konnte nicht gestartet werden. Bitte später erneut versuchen.'
+      );
+    } finally {
+      setIsBuyingCredits(false);
     }
   };
 
@@ -340,8 +357,8 @@ export function CreateCampaign({
               <p className="text-4xl">{credits}</p>
             </div>
           </div>
-          <Button onClick={onBuyCredits} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button onClick={handleBuyCredits} className="bg-blue-600 hover:bg-blue-700" disabled={isBuyingCredits}>
+            {isBuyingCredits ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
             Credits kaufen
           </Button>
         </div>
@@ -418,7 +435,7 @@ export function CreateCampaign({
               <AlertDescription>
                 <strong>Erforderliche Spalten:</strong> URL, Anrede, Vorname, Nachname, Straße, Hausnummer, PLZ, Stadt
                 <br />
-                <span className="text-sm text-slate-600">Weitere Daten werden in n8n automatisch recherchiert.</span>
+                <span className="text-sm text-slate-600">Weitere Daten werden automatisch recherchiert.</span>
               </AlertDescription>
             </Alert>
           </div>

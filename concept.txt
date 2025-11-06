@@ -156,7 +156,7 @@ Fehlerpfade: `generation_failed`, `dispatch_failed`.
 
 ### 5.3 UI-Anzeigen
 - Dashboard-Header zeigt Credits + Verlaufs-CTA (Ledger Popup).
-- Bei Kreditmangel: Kampagne kann nicht erstellt werden → UI bietet “Credits kaufen” (Stripe-Integration in Phase 2).
+- Bei Kreditmangel: Kampagne kann nicht erstellt werden → UI bietet “Credits kaufen” (Stripe Checkout mit Pitch Credits).
 
 ----------------------------------------------------
 6. Integrationen
@@ -179,9 +179,11 @@ Fehlerpfade: `generation_failed`, `dispatch_failed`.
   1. Eingabe: Kampagnen-ID.
   2. Aktionen: PDFs als ZIP, Versand an Druckpartner, Supabase-Update.
 
-### 6.3 Stripe (Phase 2 – nicht MVP)
-- Payment Intent für Credit-Pakete.
-- Webhook -> Supabase Edge Function -> Credits gutschreiben + Ledger-Eintrag.
+### 6.3 Stripe Checkout & Credits (Teil des MVP)
+- Produkt „Pitch Credits“ in Stripe mit Bundles (z. B. 50, 100, 200 Credits).
+- Checkout Session wird vom Backend erstellt, Kunde wählt Bundle, bezahlt einmalig.
+- Webhook (Edge Function oder Render-Service) validiert Events (`checkout.session.completed`), liest Price-ID → Credit-Anzahl, bucht `profiles.credits += credits`, legt Ledger-Eintrag an.
+- Dashboard bestätigt Kauf und zeigt aktualisierte Credits + Bundle-Name.
 
 ----------------------------------------------------
 7. Frontend MVP Scope
@@ -221,11 +223,12 @@ Fehlerpfade: `generation_failed`, `dispatch_failed`.
 - n8n lokal oder via Cloud-Instance (Konfiguration separat dokumentieren).
 
 ----------------------------------------------------
-9. Roadmap MVP → Phase 2
+9. Roadmap (MVP)
 ----------------------------------------------------
-1. **MVP (jetzt)**: Auth, Credits, Kampagnenflow, n8n-Integration, Landingpage.
-2. Phase 2: Stripe Billing, Admin-Console, tieferes Reporting, Audit Trails.
-3. Phase 3: Mehrsprachigkeit (EN), Team-Accounts, API-Zugriff.
+- Auth & Magic-Link-Flow live schalten.
+- Credit-Abrechnung inkl. Stripe-Checkout und Ledger fertigstellen.
+- Kampagnen-Workflow (Upload → Generierung → Versand) stabilisieren.
+- Embed-Infrastruktur (Heygen, Gamma) produktiv testen.
 
 ----------------------------------------------------
 10. Offene Entscheidungen / Risiken
@@ -251,7 +254,7 @@ Fehlerpfade: `generation_failed`, `dispatch_failed`.
 ----------------------------------------------------
 - **Logout**: Frontend ruft `supabase.auth.signOut()`, leitet zur Landingpage; Session-Listener räumt lokalen State auf.
 - **Profil löschen**: UI bietet “Account schließen”; Backend setzt `profiles.deleted_at = now()`, deaktiviert Supabase-User via Service Role (`auth.admin.deleteUser`). Kampagnen & Ledger bleiben erhalten, aber werden mit `deleted_at` markiert.
-- **Billing History**: Dashboard zeigt Ledger-Liste (`credit_ledger`) inkl. Datum, Betrag, Grund (z.B. `signup_bonus`, `campaign_base`). Export als CSV optional Phase 2.
+- **Billing History**: Dashboard zeigt Ledger-Liste (`credit_ledger`) inkl. Datum, Betrag, Grund (z.B. `signup_bonus`, `campaign_base`). CSV-Export kann bei Bedarf nachgezogen werden.
 - **Audit**: Alle statusändernden Aktionen (Kampagne anlegen, Credits abbuchen, Versand triggern) werden serverseitig geloggt (`campaign_events`).
 
 ----------------------------------------------------

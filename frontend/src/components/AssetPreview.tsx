@@ -8,9 +8,42 @@ import { ProspectLandingPage } from './ProspectLandingPage';
 import { Link } from 'react-router-dom';
 
 const mockProspects = [
-  { id: '001', name: 'Max Mustermann', company: 'Tech Solutions GmbH', stadt: 'Berlin', url: 'https://techsolutions.de', anrede: 'Herr', nachname: 'Mustermann', vorname: 'Max' },
-  { id: '002', name: 'Anna Schmidt', company: 'Digital Innovations AG', stadt: 'München', url: 'https://digital-innovations.de', anrede: 'Frau', nachname: 'Schmidt', vorname: 'Anna' },
-  { id: '003', name: 'Thomas Weber', company: 'Cloud Systems Ltd', stadt: 'Hamburg', url: 'https://cloudsystems.com', anrede: 'Herr', nachname: 'Weber', vorname: 'Thomas' }
+  {
+    id: '001',
+    name: 'Max Mustermann',
+    company: 'Tech Solutions GmbH',
+    stadt: 'Berlin',
+    url: 'https://techsolutions.de',
+    anrede: 'Herr',
+    nachname: 'Mustermann',
+    vorname: 'Max',
+    avatarEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation'
+  },
+  {
+    id: '002',
+    name: 'Anna Schmidt',
+    company: 'Digital Innovations AG',
+    stadt: 'München',
+    url: 'https://digital-innovations.de',
+    anrede: 'Frau',
+    nachname: 'Schmidt',
+    vorname: 'Anna',
+    avatarEmbedUrl: null,
+    presentationEmbedUrl: null
+  },
+  {
+    id: '003',
+    name: 'Thomas Weber',
+    company: 'Cloud Systems Ltd',
+    stadt: 'Hamburg',
+    url: 'https://cloudsystems.com',
+    anrede: 'Herr',
+    nachname: 'Weber',
+    vorname: 'Thomas',
+    avatarEmbedUrl: 'https://app.heygen.com/embeds/your-demo-video',
+    presentationEmbedUrl: 'https://gamma.app/embed/your-demo-presentation'
+  }
 ];
 
 export function AssetPreview() {
@@ -152,7 +185,7 @@ export function AssetPreview() {
                 <div>
                   <h3 className="mb-2">Lead Capture</h3>
                   <p className="text-sm text-slate-600">
-                    Formular sammelt E-Mail & Telefon, Daten werden direkt in Supabase gespeichert und im CRM weitergeleitet.
+                    Formular sammelt E-Mail & Telefon, Daten werden sicher gespeichert und ins CRM weitergeleitet.
                   </p>
                 </div>
               </div>
@@ -170,7 +203,9 @@ export function AssetPreview() {
           vorname: prospect.vorname,
           nachname: prospect.nachname,
           stadt: prospect.stadt,
-          url: prospect.url
+          url: prospect.url,
+          avatarEmbedUrl: prospect.avatarEmbedUrl,
+          presentationEmbedUrl: prospect.presentationEmbedUrl
         }}
       />
     </div>

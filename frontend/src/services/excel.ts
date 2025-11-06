@@ -36,7 +36,7 @@ export async function parseExcelFile(file: File): Promise<ProspectRow[]> {
         }
 
         // Parse workbook
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         
         // Get first sheet
         const sheetName = workbook.SheetNames[0];
@@ -126,8 +126,8 @@ export async function parseExcelFile(file: File): Promise<ProspectRow[]> {
       reject(new Error('Failed to read file'));
     };
 
-    // Read file as binary string
-    reader.readAsBinaryString(file);
+    // Read file as ArrayBuffer for broad browser support
+    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -157,4 +157,3 @@ export function validateExcelFile(file: File): { valid: boolean; error?: string 
 
   return { valid: true };
 }
-
