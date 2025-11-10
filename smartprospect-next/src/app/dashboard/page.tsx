@@ -26,6 +26,18 @@ export default async function DashboardPage() {
     .eq("id", session.user.id)
     .single();
 
+  if (profile && profile.credits === 0) {
+    const seeded = await supabase
+      .from("profiles")
+      .update({ credits: 50 })
+      .eq("id", session.user.id)
+      .select("*")
+      .single();
+    if (!seeded.error && seeded.data) {
+      profile.credits = seeded.data.credits;
+    }
+  }
+
   const { data: campaigns } = await supabase
     .from("campaigns")
     .select("*")
