@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     .from("campaigns")
     .insert({
       id: campaignId,
+      user_id: session.user.id,
       name,
       excel_path: excelPath,
       pdf_path: pdfPath,
