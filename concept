@@ -1,0 +1,151 @@
+Perfekt — mit den beiden Infos kann ich dir jetzt das Fachkonzept technisch aktualisieren.
+Ich habe den Supabase-Link, die Render-Domain und den Excel-Download sauber integriert, ohne den Rest zu verändern.
+
+⸻
+
+Smart Prospect – MVP Fachkonzept (aktualisiert 10.11.2025)
+
+0. Kurzüberblick
+	•	Zweck: Personalisierte Offline-Flyer mit parametrisiertem QR-Code, der zu einer offenen Landingpage führt.
+	•	Betriebsmodell: SaaS mit Credits (Stripe)
+	•	Auth: Supabase Magic Link
+	•	Orchestrierung: n8n (zwei Workflows)
+	•	Frontend: Next.js + Tailwind, deployed auf Render
+	•	Speicher/DB: Supabase
+	•	Startguthaben: 5 Credits bei erster Anmeldung
+	•	Credit-Logik: 1 Credit = 1 Prospect
+	•	Downloadbare Excel-Vorlage direkt in der App verfügbar
+
+⸻
+
+1) Rollen & Rechte
+
+Kampagnen-Ersteller
+	•	legt Kampagnen an (Name, Upload Excel/CSV + PDF)
+	•	prüft generierte Ergebnisse
+	•	gibt Kampagne frei und löst Versand aus
+
+⸻
+
+2) Statusmodell
+
+Status	Beschreibung	Auslöser
+in_erstllg	Kampagne angelegt, n8n #1 gestartet	Upload & Start
+bereit_zur_pruefung	n8n #1 fertig, Assets vorliegend	n8n #1 → Callback
+geprueft	Nutzer bestätigt Assets	Button „Geprüft OK“
+versandt	n8n #2 Versand abgeschlossen	n8n #2 → Callback
+
+
+⸻
+
+3) End-to-End-Prozess
+
+Upload & Generierung
+	1.	Nutzer meldet sich per Magic Link an → + 5 Credits
+	2.	Nutzer legt Kampagne an:
+	•	Felder: Name, Excel/CSV, Service-PDF
+	•	App speichert beide Dateien in Supabase (uploads/…)
+	•	App ruft n8n #1 auf:
+
+POST https://n8n.sitesavvy.de/webhook/57fe870d-0ee0-4b6d-ba43-f87ed449a191
+
+
+	•	Credits = Zeilenanzahl × 1 werden abgezogen
+	•	Kampagnen-Status → in_erstllg
+
+	3.	n8n #1: generiert alle Assets (Flyer + QR-Code + Landingpage-URL)
+	•	Callback:
+
+POST https://smartprospect.onrender.com/api/callback/n8n/generation
+
+
+	•	setzt Status → bereit_zur_pruefung
+
+Prüfung & Freigabe
+	•	Popover-Tabelle: Stadt | Website | PDF | Landingpage
+	•	Vorschau über Links
+	•	Button „Geprüft OK“ → Status geprueft
+
+Versand
+	•	Button „Kampagne versenden“ ruft n8n #2 auf:
+
+POST https://n8n.sitesavvy.de/webhook/be57dc86-a1a7-4ea4-95a6-f5f98251880f
+
+
+	•	n8n sendet an Druckdienstleister
+	•	Callback:
+
+POST https://smartprospect.onrender.com/api/callback/n8n/send
+
+
+	•	setzt Status versandt
+
+⸻
+
+4) Pflichtfelder & Vorlage-Download
+
+Excel/CSV Pflichtspalten:
+
+company_url | anrede | vorname | nachname | strasse | hausnummer | plz | ort
+
+Downloadbare Vorlage (öffentlich, Supabase Bucket static):
+👉 Beispiel-Excel herunterladen￼
+
+Frontend-Snippet:
+
+<a
+  href="https://esahpbsttcpiujqtxqet.supabase.co/storage/v1/object/public/static/prospect_template.xlsx"
+  download
+  className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+>
+  Beispiel-Excel herunterladen
+</a>
+
+Regeln:
+	•	Generierung nur bei vollständigen Pflichtfeldern
+	•	Fehlerhafte Zeilen werden geloggt, nicht blockierend
+	•	QR-Codes eindeutig (UUID v4)
+	•	Keine Änderungen nach versandt
+
+⸻
+
+5) Landingpage (öffentlich)
+	•	Route:
+
+https://smartprospect.onrender.com/p/{campaignId}/{prospectId}?t={uuid}
+
+
+	•	Keine Authentifizierung
+	•	Lädt personalisierte Inhalte aus Supabase
+	•	Prüft t-Parameter → 404, wenn ungültig
+
+⸻
+
+6) Technischer Stack
+
+Komponente	Aufgabe
+Next.js + Tailwind	Frontend + API Routes
+Supabase	Auth (Magic Link), Storage, DB
+Stripe	Credits (Checkout / Webhook)
+n8n #1	Generierung (Flyer + QR + Landingpage-URL)
+n8n #2	Versand an Druckdienstleister
+Render.com	Hosting der Next.js-App
+
+
+⸻
+
+7) Callbacks & URLs
+
+Funktion	Endpoint
+App → n8n #1	https://n8n.sitesavvy.de/webhook/57fe870d-0ee0-4b6d-ba43-f87ed449a191
+n8n #1 → App	https://smartprospect.onrender.com/api/callback/n8n/generation
+App → n8n #2	https://n8n.sitesavvy.de/webhook/be57dc86-a1a7-4ea4-95a6-f5f98251880f
+n8n #2 → App	https://smartprospect.onrender.com/api/callback/n8n/send
+Excel-Template	https://esahpbsttcpiujqtxqet.supabase.co/storage/v1/object/public/static/prospect_template.xlsx
+
+
+⸻
+
+8) Ziel des MVP
+- kompletter mvp als end-to-end lösung live und ausrollbar.
+- keine dummy daten oder placeholder - bereit um produktiv gestellt zu werden
