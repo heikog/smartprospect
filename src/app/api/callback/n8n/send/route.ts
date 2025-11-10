@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
+import type { TablesInsert } from "@/types/database";
 
 function verifySecret(request: NextRequest) {
   if (!env.N8N_SHARED_SECRET) return true;
@@ -20,13 +21,15 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabaseAdminClient();
-  await supabase.from("n8n_job_runs").insert({
+  const jobRun: TablesInsert<"n8n_job_runs"> = {
     campaign_id: campaignId,
     kind: "send",
     external_run_id: payload.jobId ?? null,
     status: payload.status ?? "unknown",
     response_payload: payload,
-  });
+  };
+
+  await supabase.from("n8n_job_runs").insert(jobRun);
 
   if (payload.status === "success") {
     await supabase

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
+import type { TablesInsert } from "@/types/database";
 
 function verifySecret(request: NextRequest) {
   if (!env.N8N_SHARED_SECRET) return true;
@@ -21,13 +22,15 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabaseAdminClient();
-  await supabase.from("n8n_job_runs").insert({
+  const jobRun: TablesInsert<"n8n_job_runs"> = {
     campaign_id: campaignId,
     kind: "generation",
     external_run_id: payload.jobId ?? null,
     status: payload.status ?? "unknown",
     response_payload: payload,
-  });
+  };
+
+  await supabase.from("n8n_job_runs").insert(jobRun);
 
   if (payload.status === "success") {
     await supabase
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
         error_log: prospect.error_log ?? null,
         is_valid: prospect.is_valid ?? true,
         tracking_token: prospect.tracking_token ? String(prospect.tracking_token) : randomUUID(),
-      }));
+      } as TablesInsert<"campaign_prospects">));
 
       await supabase.from("campaign_prospects").upsert(rows, { onConflict: "campaign_id,row_index" });
     }
