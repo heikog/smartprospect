@@ -1,17 +1,14 @@
-export type CampaignStatus =
-  | "in_erstllg"
-  | "bereit_zur_pruefung"
-  | "geprueft"
-  | "versandt";
-
-export type CreditReason =
-  | "signup_bonus"
-  | "purchase"
-  | "generation_debit"
-  | "manual_adjustment"
-  | "refund";
-
+export type CampaignStatus = "in_erstllg" | "bereit_zur_pruefung" | "geprueft" | "versandt";
+export type CreditReason = "signup_bonus" | "purchase" | "generation_debit" | "manual_adjustment" | "refund";
 export type JobKind = "generation" | "send";
+
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type Database = {
   public: {
@@ -36,33 +33,6 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
-      };
-      credit_events: {
-        Row: {
-          id: number;
-          user_id: string;
-          reason: CreditReason;
-          delta: number;
-          reference_type: string | null;
-          reference_id: string | null;
-          notes: string | null;
-          metadata: Record<string, unknown> | null;
-          stripe_event_id: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: number;
-          user_id: string;
-          reason: CreditReason;
-          delta: number;
-          reference_type?: string | null;
-          reference_id?: string | null;
-          notes?: string | null;
-          metadata?: Record<string, unknown> | null;
-          stripe_event_id?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["credit_events"]["Insert"]>;
       };
       campaigns: {
         Row: {
@@ -99,25 +69,6 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["campaigns"]["Insert"]>;
       };
-      campaign_status_history: {
-        Row: {
-          id: number;
-          campaign_id: string;
-          prior_status: CampaignStatus | null;
-          next_status: CampaignStatus;
-          reason: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: number;
-          campaign_id: string;
-          prior_status?: CampaignStatus | null;
-          next_status: CampaignStatus;
-          reason?: string | null;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["campaign_status_history"]["Insert"]>;
-      };
       campaign_prospects: {
         Row: {
           id: string;
@@ -134,7 +85,7 @@ export type Database = {
           qr_code_path: string | null;
           flyer_pdf_path: string | null;
           landingpage_path: string | null;
-          error_log: Record<string, unknown> | null;
+          error_log: Json | null;
           is_valid: boolean;
           tracking_token: string;
           created_at: string;
@@ -155,7 +106,7 @@ export type Database = {
           qr_code_path?: string | null;
           flyer_pdf_path?: string | null;
           landingpage_path?: string | null;
-          error_log?: Record<string, unknown> | null;
+          error_log?: Json | null;
           is_valid?: boolean;
           tracking_token?: string;
           created_at?: string;
@@ -163,14 +114,41 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["campaign_prospects"]["Insert"]>;
       };
+      credit_events: {
+        Row: {
+          id: number;
+          user_id: string;
+          reason: CreditReason;
+          delta: number;
+          reference_type: string | null;
+          reference_id: string | null;
+          notes: string | null;
+          metadata: Json | null;
+          stripe_event_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          reason: CreditReason;
+          delta: number;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          notes?: string | null;
+          metadata?: Json | null;
+          stripe_event_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["credit_events"]["Insert"]>;
+      };
       n8n_job_runs: {
         Row: {
           id: number;
           campaign_id: string;
           kind: JobKind;
           external_run_id: string | null;
-          request_payload: Record<string, unknown> | null;
-          response_payload: Record<string, unknown> | null;
+          request_payload: Json | null;
+          response_payload: Json | null;
           status: string | null;
           created_at: string;
           completed_at: string | null;
@@ -180,13 +158,36 @@ export type Database = {
           campaign_id: string;
           kind: JobKind;
           external_run_id?: string | null;
-          request_payload?: Record<string, unknown> | null;
-          response_payload?: Record<string, unknown> | null;
+          request_payload?: Json | null;
+          response_payload?: Json | null;
           status?: string | null;
           created_at?: string;
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["n8n_job_runs"]["Insert"]>;
+      };
+      stripe_webhook_events: {
+        Row: {
+          id: number;
+          stripe_event_id: string;
+          type: string;
+          livemode: boolean | null;
+          raw_payload: Json;
+          received_at: string;
+          processed_at: string | null;
+          error: string | null;
+        };
+        Insert: {
+          id?: number;
+          stripe_event_id: string;
+          type: string;
+          livemode?: boolean | null;
+          raw_payload: Json;
+          received_at?: string;
+          processed_at?: string | null;
+          error?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["stripe_webhook_events"]["Insert"]>;
       };
       stripe_checkout_sessions: {
         Row: {
@@ -196,13 +197,8 @@ export type Database = {
           stripe_customer_id: string | null;
           stripe_price_id: string;
           credit_quantity: number;
-          status:
-            | "open"
-            | "complete"
-            | "expired"
-            | "async_payment_pending"
-            | "async_payment_failed";
-          raw_session: Record<string, unknown> | null;
+          status: "open" | "complete" | "expired" | "async_payment_pending" | "async_payment_failed";
+          raw_session: Json | null;
           completed_at: string | null;
           credit_event_id: number | null;
           created_at: string;
@@ -215,42 +211,14 @@ export type Database = {
           stripe_customer_id?: string | null;
           stripe_price_id: string;
           credit_quantity: number;
-          status?:
-            | "open"
-            | "complete"
-            | "expired"
-            | "async_payment_pending"
-            | "async_payment_failed";
-          raw_session?: Record<string, unknown> | null;
+          status?: "open" | "complete" | "expired" | "async_payment_pending" | "async_payment_failed";
+          raw_session?: Json | null;
           completed_at?: string | null;
           credit_event_id?: number | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["stripe_checkout_sessions"]["Insert"]>;
-      };
-      stripe_webhook_events: {
-        Row: {
-          id: number;
-          stripe_event_id: string;
-          type: string;
-          livemode: boolean | null;
-          raw_payload: Record<string, unknown>;
-          received_at: string;
-          processed_at: string | null;
-          error: string | null;
-        };
-        Insert: {
-          id?: number;
-          stripe_event_id: string;
-          type: string;
-          livemode?: boolean | null;
-          raw_payload: Record<string, unknown>;
-          received_at?: string;
-          processed_at?: string | null;
-          error?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["stripe_webhook_events"]["Insert"]>;
       };
     };
     Views: {
@@ -269,16 +237,18 @@ export type Database = {
           p_stripe_price_id: string;
           p_credit_quantity: number;
           p_stripe_event_id: string;
-          p_raw_session?: Record<string, unknown> | null;
+          p_raw_session?: Json | null;
         };
         Returns: number;
       };
     };
+    Enums: {
+      campaign_status: CampaignStatus;
+      credit_reason: CreditReason;
+      job_kind: JobKind;
+    };
   };
 };
 
-export type Tables<T extends keyof Database["public"]["Tables"]> =
-  Database["public"]["Tables"][T]["Row"];
-
-export type TablesInsert<T extends keyof Database["public"]["Tables"]> =
-  Database["public"]["Tables"][T]["Insert"];
+export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
+export type TablesInsert<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];
