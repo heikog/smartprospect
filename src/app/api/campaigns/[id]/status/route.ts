@@ -4,7 +4,11 @@ import type { CampaignStatus } from "@/types/database";
 
 const allowedStatuses: CampaignStatus[] = ["geprueft"];
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
   const { supabase } = createSupabaseRouteHandlerClient(request);
   const {
     data: { user },
@@ -25,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     .from("campaigns")
     .update({ status: nextStatus })
     .eq("user_id", user.id)
-    .eq("id", params.id)
+    .eq("id", id)
     .select()
     .maybeSingle();
 

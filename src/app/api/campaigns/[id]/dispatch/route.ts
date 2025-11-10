@@ -3,7 +3,11 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 import { triggerN8nWorkflow } from "@/lib/n8n";
 import { env } from "@/lib/env";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
   const { supabase } = createSupabaseRouteHandlerClient(request);
   const {
     data: { user },
@@ -17,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .from("campaigns")
     .select("status")
     .eq("user_id", user.id)
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !campaign) {
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 
   await triggerN8nWorkflow(env.N8N_SEND_WEBHOOK_URL, {
-    campaignId: params.id,
+    campaignId: id,
     callbackUrl: env.N8N_SEND_CALLBACK_URL,
   });
 

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 import { deleteStorageObjects } from "@/lib/storage";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
   const { supabase } = createSupabaseRouteHandlerClient(request);
   const {
     data: { user },
@@ -16,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     .from("campaigns")
     .select("*, campaign_prospects(*)")
     .eq("user_id", user.id)
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !campaign) {
@@ -26,7 +30,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ campaign });
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
   const { supabase } = createSupabaseRouteHandlerClient(request);
   const {
     data: { user },
@@ -40,7 +48,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     .from("campaigns")
     .select("source_excel_path, service_pdf_path")
     .eq("user_id", user.id)
-    .eq("id", params.id)
+    .eq("id", id)
     .maybeSingle();
 
   if (error || !campaign) {
@@ -51,7 +59,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     .from("campaigns")
     .delete()
     .eq("user_id", user.id)
-    .eq("id", params.id);
+    .eq("id", id);
 
   if (deleteError) {
     return NextResponse.json({ message: deleteError.message }, { status: 400 });
