@@ -27,7 +27,8 @@ const statusLabel: Record<CampaignStatus, string> = {
   versandt: "Versandt",
 };
 
-type LoadingState = null | { id: string; action: "review" | "send" | "delete" };
+type LoadingAction = "review" | "send" | "delete";
+type LoadingState = null | { id: string; action: LoadingAction };
 
 async function request(url: string, options: RequestInit) {
   const response = await fetch(url, options);
@@ -43,7 +44,7 @@ export function CampaignList({ campaigns }: { campaigns: Campaign[] }) {
   const [loading, setLoading] = useState<LoadingState>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function mutate(id: string, action: LoadingState["action"], fetcher: () => Promise<unknown>) {
+  async function mutate(id: string, action: LoadingAction, fetcher: () => Promise<unknown>) {
     setLoading({ id, action });
     setError(null);
     try {
@@ -97,7 +98,7 @@ export function CampaignList({ campaigns }: { campaigns: Campaign[] }) {
                 }
                 disabled={loading?.id === campaign.id}
               >
-                {loading?.id === campaign.id && loading.action === "review"
+                {loading?.id === campaign.id && loading?.action === "review"
                   ? "Markiere…"
                   : "Geprüft OK"}
               </Button>
@@ -112,7 +113,7 @@ export function CampaignList({ campaigns }: { campaigns: Campaign[] }) {
                 }
                 disabled={loading?.id === campaign.id}
               >
-                {loading?.id === campaign.id && loading.action === "send"
+                {loading?.id === campaign.id && loading?.action === "send"
                   ? "Sende…"
                   : "Kampagne versenden"}
               </Button>
@@ -128,7 +129,7 @@ export function CampaignList({ campaigns }: { campaigns: Campaign[] }) {
               }
               disabled={loading?.id === campaign.id}
             >
-              {loading?.id === campaign.id && loading.action === "delete" ? "Lösche…" : "Löschen"}
+              {loading?.id === campaign.id && loading?.action === "delete" ? "Lösche…" : "Löschen"}
             </Button>
           </div>
         </Card>

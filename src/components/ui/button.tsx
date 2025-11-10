@@ -2,6 +2,7 @@
 
 import { forwardRef } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -18,23 +19,28 @@ const variantStyles: Record<ButtonVariant, string> = {
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   icon?: ReactNode;
+  asChild?: boolean;
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", icon, children, ...props }, ref) => (
-    <button
-      ref={ref}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-        variantStyles[variant],
-        className,
-      )}
-      {...props}
-    >
-      {icon}
-      {children}
-    </button>
-  ),
+  ({ className, variant = "primary", icon, children, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+
+    return (
+      <Comp
+        ref={ref as never}
+        className={cn(
+          "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+          variantStyles[variant],
+          className,
+        )}
+        {...props}
+      >
+        {icon}
+        {children}
+      </Comp>
+    );
+  },
 );
 
 Button.displayName = "Button";

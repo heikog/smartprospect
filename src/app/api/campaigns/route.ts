@@ -64,14 +64,16 @@ export async function POST(request: NextRequest) {
 
     const { data: insertedCampaign, error } = await supabase
       .from("campaigns")
-      .insert({
-        id: campaignId,
-        user_id: user.id,
-        name,
-        row_count: parseResult.rowCount,
-        source_excel_path: excelUpload.path,
-        service_pdf_path: pdfUpload.path,
-      })
+      .insert([
+        {
+          id: campaignId,
+          user_id: user.id,
+          name,
+          row_count: parseResult.rowCount,
+          source_excel_path: excelUpload.path,
+          service_pdf_path: pdfUpload.path,
+        },
+      ])
       .select()
       .maybeSingle();
 

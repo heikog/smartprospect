@@ -2,7 +2,7 @@ import Stripe from "stripe";
 import { creditPriceMap, env } from "@/lib/env";
 
 export const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-09-30.acacia",
+  apiVersion: "2025-10-29.clover",
 });
 
 export function getCreditsForPrice(priceId: string | null | undefined) {

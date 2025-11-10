@@ -35,7 +35,7 @@ export function parseProspectBuffer(buffer: Buffer, filename: string): ProspectP
     const { data, errors, meta } = Papa.parse<Record<string, unknown>>(buffer.toString("utf-8"), {
       header: true,
       skipEmptyLines: true,
-      transformHeader(header) {
+      transformHeader(header: string) {
         return header.trim().toLowerCase();
       },
     });
@@ -44,7 +44,7 @@ export function parseProspectBuffer(buffer: Buffer, filename: string): ProspectP
       throw new Error(`CSV parsing failed: ${errors[0]?.message ?? "unknown error"}`);
     }
 
-    const missingColumns = ensureColumns(meta.fields?.map((field) => field ?? "") ?? []);
+    const missingColumns = ensureColumns(meta.fields?.map((field: string) => field ?? "") ?? []);
     if (missingColumns.length) {
       throw new Error(
         `CSV file missing required columns: ${missingColumns.join(", ")}. Expected: ${requiredProspectColumns.join(", ")}`,

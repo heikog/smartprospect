@@ -33,6 +33,14 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "profiles_user_id_fkey",
+            columns: ["user_id"],
+            referencedRelation: "users",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       campaigns: {
         Row: {
@@ -68,6 +76,20 @@ export type Database = {
           deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["campaigns"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_user_id_fkey",
+            columns: ["user_id"],
+            referencedRelation: "profiles",
+            referencedColumns: ["user_id"],
+          },
+          {
+            foreignKeyName: "campaigns_debit_event_id_fkey",
+            columns: ["debit_event_id"],
+            referencedRelation: "credit_events",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       campaign_prospects: {
         Row: {
@@ -113,6 +135,14 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["campaign_prospects"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "campaign_prospects_campaign_id_fkey",
+            columns: ["campaign_id"],
+            referencedRelation: "campaigns",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       credit_events: {
         Row: {
@@ -140,6 +170,14 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["credit_events"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "credit_events_user_id_fkey",
+            columns: ["user_id"],
+            referencedRelation: "profiles",
+            referencedColumns: ["user_id"],
+          },
+        ];
       };
       n8n_job_runs: {
         Row: {
@@ -165,6 +203,14 @@ export type Database = {
           completed_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["n8n_job_runs"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "n8n_job_runs_campaign_id_fkey",
+            columns: ["campaign_id"],
+            referencedRelation: "campaigns",
+            referencedColumns: ["id"],
+          },
+        ];
       };
       stripe_webhook_events: {
         Row: {
@@ -188,6 +234,7 @@ export type Database = {
           error?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["stripe_webhook_events"]["Insert"]>;
+        Relationships: [];
       };
       stripe_checkout_sessions: {
         Row: {
@@ -219,6 +266,20 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["stripe_checkout_sessions"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "stripe_checkout_sessions_user_id_fkey",
+            columns: ["user_id"],
+            referencedRelation: "profiles",
+            referencedColumns: ["user_id"],
+          },
+          {
+            foreignKeyName: "stripe_checkout_sessions_credit_event_id_fkey",
+            columns: ["credit_event_id"],
+            referencedRelation: "credit_events",
+            referencedColumns: ["id"],
+          },
+        ];
       };
     };
     Views: {
@@ -227,6 +288,7 @@ export type Database = {
           user_id: string;
           credits: number;
         };
+        Relationships: [];
       };
     };
     Functions: {
@@ -247,6 +309,7 @@ export type Database = {
       credit_reason: CreditReason;
       job_kind: JobKind;
     };
+    CompositeTypes: Record<string, never>;
   };
 };
 

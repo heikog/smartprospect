@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     response_payload: payload,
   };
 
-  await supabase.from("n8n_job_runs").insert(jobRun);
+  await supabase.from("n8n_job_runs").insert([jobRun]);
 
   if (payload.status === "success") {
     await supabase
