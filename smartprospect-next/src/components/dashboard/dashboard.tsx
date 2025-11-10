@@ -1,50 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Sparkles, Plus, LogOut } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession, useSupabaseClient } from "@supabase/auth-helpers-react";
 
 import { Button } from "@/components/ui/button";
-import { Campaign, CampaignStatus } from "./types";
 import { CampaignList } from "./campaign-list";
 import { CreateCampaign } from "./create-campaign";
 import { CampaignDetail } from "./campaign-detail";
+import type { Campaign, Profile, Database } from "@/types/database";
 
 type View = "list" | "create" | "detail";
 
-export function Dashboard() {
-  const [view, setView] = useState<View>("create");
+interface DashboardShellProps {
+  initialCampaigns: Campaign[];
+  initialProfile: Profile | null;
+}
+
+export function DashboardShell({ initialCampaigns, initialProfile }: DashboardShellProps) {
+  const session = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const supabase = useSupabaseClient<Database>();
+  const [view, setView] = useState<View>(initialCampaigns.length ? "list" : "create");
+  const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
+  const [profile, setProfile] = useState<Profile | null>(initialProfile);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [credits, setCredits] = useState(50);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([
-    {
-      id: "camp-001",
-      name: "Q1 Tech Startups Berlin",
-      status: "review",
-      createdAt: "2025-10-28",
-      prospectCount: 47,
-      progress: 100,
-    },
-    {
-      id: "camp-002",
-      name: "Mittelstand Bayern - Software",
-      status: "generating",
-      createdAt: "2025-10-30",
-      prospectCount: 152,
-      progress: 67,
-    },
-    {
-      id: "camp-003",
-      name: "Enterprise DACH",
-      status: "approved",
-      createdAt: "2025-10-25",
-      prospectCount: 23,
-      progress: 100,
-    },
-  ]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState<"success" | "cancel" | null>(null);
+
+  useEffect(() => {
+    const status = searchParams.get("checkout");
+    if (status === "success" || status === "cancel") {
+      setCheckoutStatus(status);
+      router.replace("/dashboard", { scroll: false });
+    }
+  }, [searchParams, router]);
+
+  const refreshProfile = useCallback(async () => {
+    if (!session) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+    if (data) setProfile(data as Profile);
+  }, [session, supabase]);
+
+  const refreshCampaigns = useCallback(async () => {
+    setIsRefreshing(true);
+    const { data } = await supabase
+      .from("campaigns")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setCampaigns(data as Campaign[]);
+    setIsRefreshing(false);
+  }, [supabase]);
 
   const handleCreateCampaign = (campaign: Campaign) => {
-    setCampaigns([campaign, ...campaigns]);
+    setCampaigns((prev) => [campaign, ...prev]);
     setView("list");
+    refreshProfile();
   };
 
   const handleSelectCampaign = (campaign: Campaign) => {
@@ -53,21 +70,41 @@ export function Dashboard() {
   };
 
   const handleBackToList = () => {
-    setView("list");
     setSelectedCampaign(null);
+    setView("list");
   };
 
-  const handleBuyCredits = () => {
-    setCredits((prev) => prev + 100);
-    alert("Credits kaufen – Stripe Integration folgt.");
+  const handleDeleteCampaign = async (campaignId: string) => {
+    const confirmed = window.confirm("Kampagne wirklich löschen? Alle Assets gehen verloren.");
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/campaigns/${campaignId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body?.message ?? "Löschen fehlgeschlagen");
+      return;
+    }
+
+    setCampaigns((prev) => prev.filter((campaign) => campaign.id !== campaignId));
+    if (selectedCampaign?.id === campaignId) {
+      handleBackToList();
+    }
+    await refreshProfile();
   };
 
-  const handleStatusUpdate = (campaignId: string, status: CampaignStatus) => {
+  const handleCampaignUpdate = (updated: Campaign) => {
     setCampaigns((prev) =>
-      prev.map((campaign) =>
-        campaign.id === campaignId ? { ...campaign, status } : campaign,
-      ),
+      prev.map((campaign) => (campaign.id === updated.id ? updated : campaign)),
     );
+    setSelectedCampaign(updated);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.refresh();
   };
 
   return (
@@ -82,10 +119,13 @@ export function Dashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => setView("list")}>
-              Meine Kampagnen
+            <Button variant="ghost" size="sm" onClick={() => setView("list")} disabled={isRefreshing}>
+              {isRefreshing ? "Aktualisiere..." : "Meine Kampagnen"}
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" asChild>
+              <a href="/account">Account</a>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Abmelden
             </Button>
@@ -94,6 +134,19 @@ export function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {checkoutStatus && (
+          <div
+            className={`rounded-lg border p-4 ${
+              checkoutStatus === "success"
+                ? "border-green-300 bg-green-50 text-green-800"
+                : "border-amber-300 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {checkoutStatus === "success"
+              ? "Zahlung erfolgreich – Credits wurden gutgeschrieben."
+              : "Checkout abgebrochen. Du kannst es jederzeit erneut versuchen."}
+          </div>
+        )}
         {view === "list" && (
           <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -112,16 +165,20 @@ export function Dashboard() {
               </Button>
             </div>
 
-            <CampaignList campaigns={campaigns} onSelect={handleSelectCampaign} />
+            <CampaignList
+              campaigns={campaigns}
+              onSelect={handleSelectCampaign}
+              onDelete={handleDeleteCampaign}
+            />
           </div>
         )}
 
-        {view === "create" && (
+        {view === "create" && profile && (
           <CreateCampaign
+            profile={profile}
             onCancel={() => setView("list")}
             onCreate={handleCreateCampaign}
-            credits={credits}
-            onBuyCredits={handleBuyCredits}
+            onProfileRefresh={refreshProfile}
             campaigns={campaigns}
             onSelectCampaign={handleSelectCampaign}
           />
@@ -131,7 +188,8 @@ export function Dashboard() {
           <CampaignDetail
             campaign={selectedCampaign}
             onBack={handleBackToList}
-            onStatusChange={handleStatusUpdate}
+            onCampaignUpdate={handleCampaignUpdate}
+            onRefresh={refreshCampaigns}
           />
         )}
       </main>

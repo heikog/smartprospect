@@ -1,16 +1,17 @@
-import { Campaign } from "./types";
+import type { Campaign } from "@/types/database";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Eye, MoreVertical } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 
 interface CampaignListProps {
   campaigns: Campaign[];
   onSelect: (campaign: Campaign) => void;
+  onDelete: (campaignId: string) => void;
 }
 
-export function CampaignList({ campaigns, onSelect }: CampaignListProps) {
+export function CampaignList({ campaigns, onSelect, onDelete }: CampaignListProps) {
   return (
     <div className="space-y-4">
       {campaigns.map((campaign) => (
@@ -25,11 +26,11 @@ export function CampaignList({ campaigns, onSelect }: CampaignListProps) {
               <div className="flex flex-wrap items-center gap-6 text-sm text-slate-600">
                 <div>
                   <span className="text-slate-400">Prospects:</span>{" "}
-                  {campaign.prospectCount}
+                  {campaign.prospect_count}
                 </div>
                 <div>
                   <span className="text-slate-400">Erstellt:</span>{" "}
-                  {new Date(campaign.createdAt).toLocaleDateString("de-DE")}
+                  {new Date(campaign.created_at).toLocaleDateString("de-DE")}
                 </div>
                 <div>
                   <span className="text-slate-400">ID:</span> {campaign.id}
@@ -54,8 +55,13 @@ export function CampaignList({ campaigns, onSelect }: CampaignListProps) {
                 <Eye className="w-4 h-4 mr-2" />
                 Ansehen
               </Button>
-              <Button variant="ghost" size="sm">
-                <MoreVertical className="w-4 h-4" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(campaign.id)}
+                title="Kampagne löschen"
+              >
+                <Trash2 className="w-4 h-4 text-red-500" />
               </Button>
             </div>
           </div>
@@ -63,9 +69,20 @@ export function CampaignList({ campaigns, onSelect }: CampaignListProps) {
       ))}
 
       {campaigns.length === 0 && (
-        <div className="text-center py-20">
-          <p className="text-slate-400">Noch keine Kampagnen erstellt</p>
-        </div>
+        <Card className="p-10 text-center">
+          <h3 className="text-2xl font-semibold mb-2">Noch keine Kampagne</h3>
+          <p className="text-slate-500 max-w-2xl mx-auto">
+            Laden Sie eine Prospect-Liste und Ihr Service-PDF hoch – SmartProspect generiert automatisch Videos, Landingpages und Flyer für jeden Kontakt.
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <p className="text-sm text-slate-500">Onboarding-Checkliste:</p>
+            <ul className="text-sm text-slate-600 space-y-1">
+              <li>• Excel-Template herunterladen und befüllen</li>
+              <li>• Service-/Produkt-PDF bereitstellen</li>
+              <li>• Kampagne anlegen und Assets prüfen</li>
+            </ul>
+          </div>
+        </Card>
       )}
     </div>
   );

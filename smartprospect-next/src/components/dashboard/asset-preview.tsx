@@ -1,4 +1,7 @@
-import { useState } from "react";
+"use client";
+
+import { useMemo, useState, type ReactNode } from "react";
+import type { Prospect } from "@/types/database";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,31 +12,43 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Volume2, FileText, Download, ExternalLink } from "lucide-react";
+import { Play, Volume2, Download, ExternalLink } from "lucide-react";
 
-const mockProspects = [
-  { id: "001", name: "Max Mustermann", company: "Tech Solutions GmbH" },
-  { id: "002", name: "Anna Schmidt", company: "Digital Innovations AG" },
-  { id: "003", name: "Thomas Weber", company: "Cloud Systems Ltd" },
-];
+interface AssetPreviewProps {
+  prospects: Prospect[];
+}
 
-export function AssetPreview() {
-  const [selectedProspect, setSelectedProspect] = useState("001");
-  const prospect = mockProspects.find((p) => p.id === selectedProspect);
+export function AssetPreview({ prospects }: AssetPreviewProps) {
+  const options = useMemo(() => prospects.map((p) => ({
+    id: p.id,
+    label: p.company_name ?? (p.contact as Record<string, string>)?.name ?? p.id,
+  })), [prospects]);
+  const [selectedProspectId, setSelectedProspectId] = useState<string>(options[0]?.id ?? "");
+
+  const prospect = prospects.find((p) => p.id === selectedProspectId) ?? prospects[0];
+
+  if (!prospect) {
+    return (
+      <div className="text-sm text-slate-500">Noch keine Assets verfügbar.</div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <Card className="p-4">
         <div className="flex flex-wrap items-center gap-4">
           <span className="text-sm text-slate-600">Prospect auswählen:</span>
-          <Select value={selectedProspect} onValueChange={setSelectedProspect}>
+          <Select
+            value={selectedProspectId || prospect.id}
+            onValueChange={setSelectedProspectId}
+          >
             <SelectTrigger className="w-80">
-              <SelectValue placeholder="Prospect wählen" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {mockProspects.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name} – {p.company}
+              {options.map(({ id, label }) => (
+                <SelectItem key={id} value={id}>
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -53,169 +68,96 @@ export function AssetPreview() {
         <TabsContent value="video">
           <AssetCard
             title="Personalisiertes Avatar-Video"
-            subtitle={`für ${prospect?.name}`}
+            subtitle={prospect.company_name ?? ""}
             details={[
-              { label: "Format", value: "MP4 (1080p)" },
-              { label: "Dauer", value: "45 Sekunden" },
-              { label: "Größe", value: "8.2 MB" },
-              { label: "Erstellt", value: "01.11.2025, 14:23" },
-              { label: "Service", value: "Heygen AI" },
+              { label: "Status", value: prospect.status },
+              { label: "Letztes Update", value: new Date(prospect.created_at).toLocaleString("de-DE") },
             ]}
-          >
-            <div className="aspect-video bg-slate-900 rounded-lg flex items-center justify-center mb-4">
-              <div className="text-center text-white">
-                <Play className="w-16 h-16 mx-auto mb-3 opacity-70" />
-                <p className="text-sm opacity-70">Personalisiertes Avatar-Video</p>
-                <p className="text-xs opacity-50 mt-1">für {prospect?.name}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline">
-                <Play className="w-4 h-4 mr-2" />
-                Abspielen
-              </Button>
-              <Button size="sm" variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Herunterladen
-              </Button>
-            </div>
-          </AssetCard>
+            actions={
+              prospect.video_url && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={prospect.video_url} target="_blank" rel="noreferrer">
+                    <Play className="w-4 h-4 mr-2" />
+                    Abspielen
+                  </a>
+                </Button>
+              )
+            }
+          />
         </TabsContent>
 
         <TabsContent value="audio">
           <AssetCard
-            title="Personalisierte Audio-Botschaft"
-            subtitle={`für ${prospect?.name}`}
+            title="Audio-Botschaft"
+            subtitle={prospect.company_name ?? ""}
             details={[
-              { label: "Format", value: "MP3 (320kbps)" },
-              { label: "Dauer", value: "30 Sekunden" },
-              { label: "Größe", value: "1.2 MB" },
-              { label: "Erstellt", value: "01.11.2025, 14:23" },
-              { label: "Service", value: "ElevenLabs AI" },
+              { label: "Status", value: prospect.status },
             ]}
-          >
-            <div className="aspect-video bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg flex items-center justify-center mb-4">
-              <div className="text-center">
-                <Volume2 className="w-16 h-16 mx-auto mb-3 text-purple-600" />
-                <p className="text-sm">Personalisierte Audio-Botschaft</p>
-                <p className="text-xs text-slate-500 mt-1">für {prospect?.name}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline">
-                <Play className="w-4 h-4 mr-2" />
-                Abspielen
-              </Button>
-              <Button size="sm" variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Herunterladen
-              </Button>
-            </div>
-          </AssetCard>
+            actions={
+              prospect.audio_url && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={prospect.audio_url} target="_blank" rel="noreferrer">
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Anhören
+                  </a>
+                </Button>
+              )
+            }
+          />
         </TabsContent>
 
         <TabsContent value="presentation">
           <AssetCard
             title="Pitch-Präsentation"
-            subtitle={`für ${prospect?.name}`}
-            details={[
-              { label: "Format", value: "PDF" },
-              { label: "Seiten", value: "12" },
-              { label: "Größe", value: "3.4 MB" },
-              { label: "Erstellt", value: "01.11.2025, 14:24" },
-              { label: "Service", value: "Gamma.app" },
-            ]}
-          >
-            <div className="aspect-[4/3] bg-white border-2 rounded-lg flex items-center justify-center mb-4">
-              <div className="text-center">
-                <FileText className="w-16 h-16 mx-auto mb-3 text-blue-600" />
-                <p className="text-sm">Pitch-Präsentation</p>
-                <p className="text-xs text-slate-500 mt-1">für {prospect?.name}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Öffnen
-              </Button>
-              <Button size="sm" variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Herunterladen
-              </Button>
-            </div>
-          </AssetCard>
+            subtitle={prospect.company_name ?? ""}
+            details={[]}
+            actions={
+              prospect.presentation_url && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={prospect.presentation_url} target="_blank" rel="noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Öffnen
+                  </a>
+                </Button>
+              )
+            }
+          />
         </TabsContent>
 
         <TabsContent value="flyer">
           <AssetCard
             title="Druckfertiger Flyer"
-            subtitle={`für ${prospect?.name}`}
-            details={[
-              { label: "Format", value: "PDF (druckfertig)" },
-              { label: "Auflösung", value: "300 DPI" },
-              { label: "Format", value: "A4" },
-              { label: "Größe", value: "2.1 MB" },
-              { label: "QR-Code", value: "Integriert" },
-            ]}
-          >
-            <div className="aspect-[1/1.4] bg-white border-2 rounded-lg flex items-center justify-center mb-4 max-w-md mx-auto">
-              <div className="text-center p-8 space-y-4">
-                <div className="w-full h-40 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg" />
-                <div className="space-y-2 text-left">
-                  <div className="h-3 bg-slate-200 rounded w-3/4" />
-                  <div className="h-3 bg-slate-200 rounded w-full" />
-                  <div className="h-3 bg-slate-200 rounded w-5/6" />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button size="sm" variant="outline">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Vorschau
-              </Button>
-              <Button size="sm" variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Herunterladen
-              </Button>
-            </div>
-          </AssetCard>
+            subtitle={prospect.company_name ?? ""}
+            details={[]}
+            actions={
+              prospect.flyer_url && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={prospect.flyer_url} target="_blank" rel="noreferrer">
+                    <Download className="w-4 h-4 mr-2" />
+                    Herunterladen
+                  </a>
+                </Button>
+              )
+            }
+          />
         </TabsContent>
 
         <TabsContent value="landingpage">
           <AssetCard
-            title="Personalisierte Landingpage"
-            subtitle={`sp.link/${selectedProspect}`}
-            details={[
-              { label: "URL", value: `sp.link/${selectedProspect}` },
-              { label: "Status", value: "Live" },
-              { label: "QR-Code", value: "Verfügbar" },
-              { label: "Erstellt", value: "01.11.2025, 14:24" },
-            ]}
-          >
-            <div className="aspect-video bg-slate-100 border-2 rounded-lg overflow-hidden mb-4">
-              <div className="bg-gradient-to-br from-blue-600 to-purple-600 h-20 flex items-center justify-center text-white">
-                Personalisierte Landingpage
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="h-4 bg-slate-200 rounded w-2/3" />
-                <div className="h-3 bg-slate-200 rounded w-full" />
-                <div className="h-3 bg-slate-200 rounded w-5/6" />
-                <div className="grid grid-cols-2 gap-3 mt-6">
-                  <div className="h-12 bg-blue-100 rounded" />
-                  <div className="h-12 bg-purple-100 rounded" />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline">
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Landingpage öffnen
-              </Button>
-              <Button size="sm" variant="outline">
-                QR-Code anzeigen
-              </Button>
-            </div>
-          </AssetCard>
+            title="Landingpage"
+            subtitle={prospect.company_name ?? ""}
+            details={[]}
+            actions={
+              prospect.landing_page_url && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={prospect.landing_page_url} target="_blank" rel="noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Öffnen
+                  </a>
+                </Button>
+              )
+            }
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -226,32 +168,29 @@ function AssetCard({
   title,
   subtitle,
   details,
-  children,
+  actions,
 }: {
   title: string;
   subtitle?: string;
   details: { label: string; value: string }[];
-  children: React.ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <Card className="p-6">
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-1">
-          <h3 className="text-xl font-semibold mb-1">{title}</h3>
-          {subtitle && <p className="text-sm text-slate-500 mb-4">{subtitle}</p>}
-          {children}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-xl font-semibold">{title}</h3>
+          {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
         </div>
-        <div className="w-full lg:w-80 space-y-4">
-          <h4 className="font-semibold">Details</h4>
-          <div className="space-y-2 text-sm">
-            {details.map((detail) => (
-              <div key={detail.label} className="flex justify-between">
-                <span className="text-slate-500">{detail.label}:</span>
-                <span className="font-medium">{detail.value}</span>
-              </div>
-            ))}
-          </div>
+        <div className="space-y-1 text-sm">
+          {details.map((detail) => (
+            <div key={detail.label} className="flex justify-between">
+              <span className="text-slate-500">{detail.label}</span>
+              <span className="font-medium">{detail.value}</span>
+            </div>
+          ))}
         </div>
+        {actions || <p className="text-sm text-slate-400">Asset wird vorbereitet...</p>}
       </div>
     </Card>
   );

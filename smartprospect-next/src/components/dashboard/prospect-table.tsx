@@ -1,54 +1,72 @@
+import type { Prospect } from "@/types/database";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Download } from "lucide-react";
 
-const mockProspects = [
-  { id: "001", name: "Max Mustermann", company: "Tech Solutions GmbH", email: "max@techsolutions.de", status: "completed" },
-  { id: "002", name: "Anna Schmidt", company: "Digital Innovations AG", email: "anna@digital-innovations.de", status: "completed" },
-  { id: "003", name: "Thomas Weber", company: "Cloud Systems Ltd", email: "thomas@cloudsystems.com", status: "completed" },
-  { id: "004", name: "Sarah Müller", company: "Data Analytics Pro", email: "sarah@analytics-pro.de", status: "completed" },
-  { id: "005", name: "Michael Fischer", company: "Automation Works", email: "michael@automation.de", status: "completed" },
-];
-
 interface ProspectTableProps {
-  campaignId: string;
+  prospects: Prospect[];
+  loading?: boolean;
 }
 
-export function ProspectTable({ campaignId }: ProspectTableProps) {
+export function ProspectTable({ prospects, loading }: ProspectTableProps) {
   return (
     <div className="bg-white rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>ID</TableHead>
+            <TableHead>#</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Firma</TableHead>
-            <TableHead>E-Mail</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Landingpage</TableHead>
             <TableHead>Assets</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {mockProspects.map((prospect) => (
-            <TableRow key={`${campaignId}-${prospect.id}`}>
-              <TableCell className="font-mono text-sm">{prospect.id}</TableCell>
-              <TableCell>{prospect.name}</TableCell>
-              <TableCell>{prospect.company}</TableCell>
-              <TableCell className="text-sm text-slate-600">{prospect.email}</TableCell>
+          {loading && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-slate-500">
+                Lädt Prospects...
+              </TableCell>
+            </TableRow>
+          )}
+          {!loading && prospects.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-slate-400">
+                Noch keine Prospects importiert.
+              </TableCell>
+            </TableRow>
+          )}
+          {prospects.map((prospect, index) => (
+            <TableRow key={prospect.id}>
+              <TableCell className="font-mono text-sm">{index + 1}</TableCell>
+              <TableCell>{(prospect.contact as Record<string, string>)?.name ?? "-"}</TableCell>
+              <TableCell>{prospect.company_name ?? "-"}</TableCell>
               <TableCell>
-                <Badge className="bg-green-100 text-green-700">Vollständig</Badge>
+                <Badge className="bg-green-100 text-green-700">{prospect.status}</Badge>
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="sm">
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
+                {prospect.landing_page_url ? (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={prospect.landing_page_url} target="_blank" rel="noreferrer">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="sm">
-                  <Download className="w-4 h-4" />
-                </Button>
+                {prospect.video_url || prospect.flyer_url ? (
+                  <Button variant="ghost" size="sm" asChild>
+                    <a href={prospect.video_url ?? prospect.flyer_url ?? "#"} target="_blank" rel="noreferrer">
+                      <Download className="w-4 h-4" />
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
               </TableCell>
             </TableRow>
           ))}

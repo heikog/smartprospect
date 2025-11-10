@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Campaign } from "./types";
+"use client";
+
+import { useState, type ReactNode } from "react";
+import { useSession, useSupabaseClient } from "@supabase/auth-helpers-react";
+import type { Database, Campaign, Profile } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Upload,
   FileSpreadsheet,
@@ -14,72 +16,104 @@ import {
   Download,
   Plus,
   Sparkles,
-  Eye,
-  MoreVertical,
-  CheckCircle,
-  Loader2,
-  Send,
 } from "lucide-react";
-import { ReviewCampaignDialog } from "./review-campaign-dialog";
+import { BuyCreditsDialog } from "./credit-dialog";
 
 interface CreateCampaignProps {
   onCancel: () => void;
   onCreate: (campaign: Campaign) => void;
-  credits: number;
-  onBuyCredits: () => void;
+  onProfileRefresh: () => Promise<void>;
+  profile: Profile;
   campaigns: Campaign[];
   onSelectCampaign: (campaign: Campaign) => void;
 }
 
+const BASE_CAMPAIGN_COST = 50;
+
 export function CreateCampaign({
   onCancel,
   onCreate,
-  credits,
-  onBuyCredits,
-  campaigns,
-  onSelectCampaign,
+  onProfileRefresh,
+  profile,
 }: CreateCampaignProps) {
+  const session = useSession();
+  const supabase = useSupabaseClient<Database>();
   const [campaignName, setCampaignName] = useState("");
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [campaignToReview, setCampaignToReview] = useState<Campaign | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!session) {
+      setError("Bitte melden Sie sich an.");
+      return;
+    }
+    if (!excelFile || !pdfFile) {
+      setError("Bitte laden Sie sowohl Excel- als auch PDF-Datei hoch.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
 
-    const newCampaign: Campaign = {
-      id: `camp-${Date.now()}`,
-      name: campaignName || "Neue Kampagne",
-      status: "generating",
-      createdAt: new Date().toISOString().split("T")[0],
-      prospectCount: Math.floor(Math.random() * 100) + 20,
-      progress: 0,
-    };
+    const campaignId = crypto.randomUUID();
+    const basePath = `${session.user.id}/${campaignId}`;
+    const excelExtension = excelFile.name.split(".").pop() ?? "xlsx";
+    const pdfExtension = pdfFile.name.split(".").pop() ?? "pdf";
+    const excelPath = `${basePath}/prospects.${excelExtension}`;
+    const pdfPath = `${basePath}/service.${pdfExtension}`;
 
-    onCreate(newCampaign);
-    setCampaignName("");
-    setExcelFile(null);
-    setPdfFile(null);
+    try {
+      const { error: excelUploadError } = await supabase.storage
+        .from("campaign-uploads")
+        .upload(excelPath, excelFile, { upsert: true });
+      if (excelUploadError) throw excelUploadError;
+
+      const { error: pdfUploadError } = await supabase.storage
+        .from("campaign-uploads")
+        .upload(pdfPath, pdfFile, { upsert: true });
+      if (pdfUploadError) throw pdfUploadError;
+
+      const response = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId,
+          name: campaignName,
+          excelPath,
+          pdfPath,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.message ?? "Kampagne konnte nicht erstellt werden.");
+      }
+
+      const { campaign } = await response.json();
+      onCreate(campaign as Campaign);
+      await onProfileRefresh();
+      setCampaignName("");
+      setExcelFile(null);
+      setPdfFile(null);
+    } catch (uploadError) {
+      console.error(uploadError);
+      setError(uploadError instanceof Error ? uploadError.message : "Unbekannter Fehler");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const downloadExampleExcel = () => {
-    alert("Beispiel-Excel wird heruntergeladen...");
-  };
-
-  const handleOpenReviewDialog = (campaign: Campaign) => {
-    setCampaignToReview(campaign);
-    setReviewDialogOpen(true);
-  };
-
-  const handleApproveCampaign = () => {
-    if (campaignToReview) {
-      alert(`Kampagne "${campaignToReview.name}" wurde freigegeben!`);
-    }
+    window.alert("Template folgt. Bitte nutzen Sie vorerst Ihr bestehendes Excel.");
   };
 
   return (
     <div className="space-y-8">
+      <BuyCreditsDialog open={buyCreditsOpen} onOpenChange={setBuyCreditsOpen} />
+
       <Card className="p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -88,17 +122,17 @@ export function CreateCampaign({
             </div>
             <div>
               <p className="text-sm text-slate-600 mb-1">Verfügbare Credits</p>
-              <p className="text-4xl font-semibold">{credits}</p>
+              <p className="text-4xl font-semibold">{profile.credits}</p>
             </div>
           </div>
-          <Button onClick={onBuyCredits} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={() => setBuyCreditsOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Credits kaufen
           </Button>
         </div>
         <div className="mt-4 pt-4 border-t border-blue-200 text-sm text-slate-600">
-          Pro Kampagne: <span className="font-medium">49 Credits Basis</span> +{" "}
-          <span className="font-medium">1 Credit pro Prospect</span>
+          Pro Kampagne: <span className="font-medium">{BASE_CAMPAIGN_COST} Credits Basis</span> +
+          <span className="font-medium"> 1 Credit pro Prospect</span>
         </div>
       </Card>
 
@@ -106,7 +140,7 @@ export function CreateCampaign({
         <div className="mb-6">
           <h1 className="text-3xl mb-2 font-semibold">Neue Kampagne anlegen</h1>
           <p className="text-slate-600">
-            Laden Sie Ihre Prospect-Liste und Ihr Service-PDF hoch, um eine personalisierte Multichannel-Kampagne zu starten
+            Laden Sie Ihre Prospect-Liste und Ihr Service-PDF hoch, um eine personalisierte Multichannel-Kampagne zu starten.
           </p>
         </div>
 
@@ -117,7 +151,7 @@ export function CreateCampaign({
               id="campaign-name"
               placeholder="z.B. Q1 Tech Startups Berlin"
               value={campaignName}
-              onChange={(e) => setCampaignName(e.target.value)}
+              onChange={(event) => setCampaignName(event.target.value)}
               className="mt-2"
               required
             />
@@ -132,43 +166,22 @@ export function CreateCampaign({
               </Button>
             </div>
 
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50">
-              <input
-                type="file"
-                id="excel-upload"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
-                required
-              />
-              <label htmlFor="excel-upload" className="cursor-pointer flex flex-col items-center gap-4">
-                {excelFile ? (
-                  <div className="flex items-center justify-center gap-4">
-                    <FileSpreadsheet className="w-12 h-12 text-green-600" />
-                    <div className="text-left">
-                      <p className="font-medium">{excelFile.name}</p>
-                      <p className="text-sm text-slate-500">{(excelFile.size / 1024).toFixed(1)} KB</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-16 h-16 text-slate-400" />
-                    <div>
-                      <p className="mb-2 font-medium">Klicken oder Datei hierher ziehen</p>
-                      <p className="text-sm text-slate-500">Excel oder CSV mit Ihren Prospect-Daten</p>
-                    </div>
-                  </>
-                )}
-              </label>
-            </div>
+            <FileDropzone
+              id="excel-upload"
+              file={excelFile}
+              icon={<FileSpreadsheet className="w-12 h-12 text-green-600" />}
+              accept=".xlsx,.xls,.csv"
+              onChange={setExcelFile}
+              description="Excel oder CSV mit Ihren Prospect-Daten"
+            />
 
             <Alert className="mt-4">
               <Info className="h-4 w-4" />
               <AlertDescription>
-                <strong>Erforderliche Spalten:</strong> URL, Anrede, Vorname, Nachname, Straße, Hausnummer, PLZ, Stadt
+                <strong>Erforderliche Spalten:</strong> url, anrede, vorname, nachname, strasse, hausnummer, plz, stadt
                 <br />
                 <span className="text-sm text-slate-600">
-                  Diese Angaben werden für den personalisierten Versand der Flyer benötigt.
+                  Diese Angaben werden für den personalisierten Versand benötigt.
                 </span>
               </AlertDescription>
             </Alert>
@@ -176,38 +189,19 @@ export function CreateCampaign({
 
           <div>
             <Label htmlFor="pdf-upload">Produkt-/Service-PDF *</Label>
-            <p className="text-sm text-slate-500 mb-3">Ihr Angebots- oder Informationsflyer, der personalisiert wird</p>
+            <p className="text-sm text-slate-500 mb-3">Ihr Angebots- oder Informationsflyer, der personalisiert wird.</p>
 
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50">
-              <input
-                type="file"
-                id="pdf-upload"
-                accept=".pdf"
-                className="hidden"
-                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
-                required
-              />
-              <label htmlFor="pdf-upload" className="cursor-pointer flex flex-col items-center gap-4">
-                {pdfFile ? (
-                  <div className="flex items-center justify-center gap-4">
-                    <FileText className="w-12 h-12 text-red-600" />
-                    <div className="text-left">
-                      <p className="font-medium">{pdfFile.name}</p>
-                      <p className="text-sm text-slate-500">{(pdfFile.size / 1024).toFixed(1)} KB</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="w-16 h-16 text-slate-400" />
-                    <div>
-                      <p className="mb-2 font-medium">Klicken oder PDF hierher ziehen</p>
-                      <p className="text-sm text-slate-500">Ihr Service- oder Produktflyer (max. 10 MB)</p>
-                    </div>
-                  </>
-                )}
-              </label>
-            </div>
+            <FileDropzone
+              id="pdf-upload"
+              file={pdfFile}
+              icon={<FileText className="w-12 h-12 text-red-600" />}
+              accept=".pdf"
+              onChange={setPdfFile}
+              description="Ihr Service- oder Produktflyer (max. 10 MB)"
+            />
           </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-6 border-t border-blue-100">
             <Button type="button" variant="outline" onClick={onCancel}>
@@ -216,159 +210,65 @@ export function CreateCampaign({
             <Button
               type="submit"
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={!campaignName || !excelFile || !pdfFile}
+              disabled={submitting || !excelFile || !pdfFile}
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Kampagne erstellen
+              {submitting ? "Wird verarbeitet..." : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Kampagne erstellen
+                </>
+              )}
             </Button>
           </div>
         </form>
       </Card>
+    </div>
+  );
+}
 
-      <Card className="p-8">
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold mb-2">Meine Kampagnen</h2>
-          <p className="text-slate-600">Übersicht über alle erstellten Kampagnen</p>
-        </div>
-
-        {campaigns.length > 0 ? (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Kampagnenname</TableHead>
-                  <TableHead>Prospects</TableHead>
-                  <TableHead>Erstellt am</TableHead>
-                  <TableHead className="text-center">Erstellt</TableHead>
-                  <TableHead className="text-center">Generiert</TableHead>
-                  <TableHead className="text-center">Freigegeben</TableHead>
-                  <TableHead className="text-center">Versendet</TableHead>
-                  <TableHead className="text-right">Aktionen</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((campaign) => (
-                  <TableRow key={campaign.id} className="hover:bg-slate-50">
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{campaign.name}</p>
-                        <p className="text-xs text-slate-400">{campaign.id}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{campaign.prospectCount}</TableCell>
-                    <TableCell className="text-slate-600">
-                      {new Date(campaign.createdAt).toLocaleDateString("de-DE")}
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <div className="flex justify-center">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {campaign.status === "draft" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs"
-                          onClick={() => alert("Generierung starten")}
-                        >
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          Generieren
-                        </Button>
-                      ) : campaign.status === "generating" ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                          <span className="text-xs text-slate-600">
-                            {campaign.progress ?? 0}%
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex justify-center">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        </div>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {campaign.status === "review" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
-                          onClick={() => handleOpenReviewDialog(campaign)}
-                        >
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Freigeben
-                        </Button>
-                      ) : campaign.status === "approved" || campaign.status === "sent" ? (
-                        <div className="flex justify-center">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        </div>
-                      ) : (
-                        <div className="flex justify-center">
-                          <span className="text-slate-300">—</span>
-                        </div>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {campaign.status === "approved" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs bg-green-50 border-green-300 hover:bg-green-100"
-                          onClick={() => alert("Versand starten")}
-                        >
-                          <Send className="w-3 h-3 mr-1" />
-                          Versenden
-                        </Button>
-                      ) : campaign.status === "sent" ? (
-                        <div className="flex justify-center">
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        </div>
-                      ) : (
-                        <div className="flex justify-center">
-                          <span className="text-slate-300">—</span>
-                        </div>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => onSelectCampaign(campaign)}>
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+function FileDropzone({
+  id,
+  file,
+  icon,
+  accept,
+  onChange,
+  description,
+}: {
+  id: string;
+  file: File | null;
+  icon: ReactNode;
+  accept: string;
+  onChange: (file: File | null) => void;
+  description: string;
+}) {
+  return (
+    <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50">
+      <input
+        type="file"
+        id={id}
+        accept={accept}
+        className="hidden"
+        onChange={(event) => onChange(event.target.files?.[0] || null)}
+      />
+      <label htmlFor={id} className="cursor-pointer flex flex-col items-center gap-4">
+        {file ? (
+          <div className="flex items-center justify-center gap-4">
+            {icon}
+            <div className="text-left">
+              <p className="font-medium">{file.name}</p>
+              <p className="text-sm text-slate-500">{(file.size / 1024).toFixed(1)} KB</p>
+            </div>
           </div>
         ) : (
-          <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-lg">
-            <p className="text-slate-400">Noch keine Kampagnen erstellt</p>
-            <p className="text-sm text-slate-400 mt-1">
-              Erstellen Sie Ihre erste Kampagne oben
-            </p>
-          </div>
+          <>
+            <Upload className="w-16 h-16 text-slate-400" />
+            <div>
+              <p className="mb-2 font-medium">Klicken oder Datei hierher ziehen</p>
+              <p className="text-sm text-slate-500">{description}</p>
+            </div>
+          </>
         )}
-      </Card>
-
-      {campaignToReview && (
-        <ReviewCampaignDialog
-          open={reviewDialogOpen}
-          onOpenChange={setReviewDialogOpen}
-          campaignName={campaignToReview.name}
-          campaignId={campaignToReview.id}
-          onApprove={handleApproveCampaign}
-        />
-      )}
+      </label>
     </div>
   );
 }
