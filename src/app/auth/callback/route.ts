@@ -21,5 +21,10 @@ export async function GET(request: NextRequest) {
     ? metadataRedirect
     : "/dashboard";
 
+  console.log("Auth callback redirect", {
+    requestUrl: request.url,
+    redirectPath,
+  });
+
   return NextResponse.redirect(new URL(redirectPath, url.origin));
 }
