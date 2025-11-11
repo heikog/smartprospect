@@ -8,6 +8,8 @@ import { CreateCampaignForm } from "@/components/dashboard/CreateCampaignForm";
 import { CampaignList } from "@/components/dashboard/CampaignList";
 import { CreditTopUp } from "@/components/dashboard/CreditTopUp";
 import type { Tables } from "@/types/database";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient();
