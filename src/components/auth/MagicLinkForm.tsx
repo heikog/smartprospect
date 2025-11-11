@@ -27,6 +27,12 @@ export function MagicLinkForm({ redirectTo, redirectPath }: { redirectTo: string
       ? redirectPath
       : "/dashboard";
 
+    // Debug log to verify which redirect URL is sent to Supabase (visible in Render logs)
+    console.log("Magic link redirect:", {
+      redirectTo,
+      sanitizedRedirect,
+    });
+
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
       options: {
