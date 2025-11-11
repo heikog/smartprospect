@@ -5,7 +5,7 @@ import { env } from "@/lib/env.server";
 import type { Database } from "@/types/database";
 import { swallowCookieMutationError } from "@/lib/supabase/cookie-helpers";
 
-export async function createSupabaseServerClient(): Promise<SupabaseClient<Database>> {
+export async function createServerSupabaseClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
   const mutableStore = cookieStore as unknown as {
     set?: (name: string, value: string, options?: CookieOptions) => void;

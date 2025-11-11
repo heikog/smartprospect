@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client";
 import { deleteStorageObjects } from "@/lib/storage";
 
 export async function GET(

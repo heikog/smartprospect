@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client";
 import { parseProspectBuffer } from "@/lib/prospect-parser";
 import { uploadCampaignAsset } from "@/lib/storage";
 import { triggerN8nWorkflow } from "@/lib/n8n";

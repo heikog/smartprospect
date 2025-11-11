@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client";
 import type { CampaignStatus } from "@/types/database";
 
 const allowedStatuses: CampaignStatus[] = ["geprueft"];

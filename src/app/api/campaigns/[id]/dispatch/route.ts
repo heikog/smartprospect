@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client";
 import { triggerN8nWorkflow } from "@/lib/n8n";
 import { env } from "@/lib/env.server";
 

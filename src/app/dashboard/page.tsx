@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server-client";
 import { env } from "@/lib/env.server";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function DashboardPage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

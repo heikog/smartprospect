@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server-client";
 import { env } from "@/lib/env.server";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createServerSupabaseClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
