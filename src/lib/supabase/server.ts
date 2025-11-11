@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import type { Database } from "@/types/database";
 
 const COOKIE_MUTATION_ERROR = "Cookies can only be modified in a Server Action or Route Handler";

@@ -24,7 +24,7 @@ export function MagicLinkForm({ redirectTo }: { redirectTo: string }) {
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${redirectTo}?redirect=/dashboard`,
+        emailRedirectTo: redirectTo,
       },
     });
 

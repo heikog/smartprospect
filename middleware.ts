@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/database";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/campaigns"];
 

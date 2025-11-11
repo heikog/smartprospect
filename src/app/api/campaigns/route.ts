@@ -5,7 +5,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 import { parseProspectBuffer } from "@/lib/prospect-parser";
 import { uploadCampaignAsset } from "@/lib/storage";
 import { triggerN8nWorkflow } from "@/lib/n8n";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 
 export const runtime = "nodejs";
 

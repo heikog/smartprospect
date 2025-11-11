@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import { read, utils } from "xlsx";
-import { requiredProspectColumns } from "@/lib/env";
+import { requiredProspectColumns } from "@/lib/env.server";
 
 type ParsedRow = Record<string, string>;
 

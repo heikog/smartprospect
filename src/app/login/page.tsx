@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import { MagicLinkForm } from "@/components/auth/MagicLinkForm";
 
 export const metadata: Metadata = {

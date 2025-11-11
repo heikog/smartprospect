@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const PUBLIC_STORAGE_BASE = `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public` as const;

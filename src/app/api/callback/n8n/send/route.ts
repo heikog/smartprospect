@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import type { TablesInsert } from "@/types/database";
 
 function verifySecret(request: NextRequest) {

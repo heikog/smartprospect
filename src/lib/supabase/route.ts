@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import type { Database } from "@/types/database";
 
 export function createSupabaseRouteHandlerClient(

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

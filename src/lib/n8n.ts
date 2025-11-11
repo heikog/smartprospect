@@ -1,4 +1,4 @@
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 
 export async function triggerN8nWorkflow(url: string, payload: Record<string, unknown>) {
   const response = await fetch(url, {

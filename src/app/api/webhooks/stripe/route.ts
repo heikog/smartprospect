@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { stripe, getCreditsForPrice } from "@/lib/stripe";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
 

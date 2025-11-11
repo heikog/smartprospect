@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 import { stripe, getCreditsForPrice } from "@/lib/stripe";
-import { env } from "@/lib/env";
+import { env } from "@/lib/env.server";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
