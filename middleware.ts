@@ -2,11 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "@/types/database";
 import { env } from "@/lib/env.server";
+import { swallowCookieMutationError } from "@/lib/supabase/cookie-helpers";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/campaigns"];
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
+
+  const safeSet = swallowCookieMutationError(
+    (name: string, value: string, options?: CookieOptions) =>
+      response.cookies.set({ name, value, ...options }),
+  );
+  const safeDelete = swallowCookieMutationError(
+    (name: string, options?: CookieOptions) =>
+      response.cookies.delete({ name, ...options }),
+  );
 
   const supabase = createServerClient<Database>(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -17,10 +27,10 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
+          void safeSet?.(name, value, options);
         },
         remove(name: string, options: CookieOptions) {
-          response.cookies.delete({ name, ...options });
+          void safeDelete?.(name, options);
         },
       },
     },

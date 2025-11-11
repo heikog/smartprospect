@@ -3,24 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { env } from "@/lib/env.server";
 import type { Database } from "@/types/database";
-
-const COOKIE_MUTATION_ERROR = "Cookies can only be modified in a Server Action or Route Handler";
-
-function swallowCookieMutationError<T extends unknown[]>(
-  mutate: ((...args: T) => unknown) | undefined,
-) {
-  if (!mutate) return undefined;
-  return async (...args: T) => {
-    try {
-      await mutate(...args);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes(COOKIE_MUTATION_ERROR)) {
-        return;
-      }
-      throw error;
-    }
-  };
-}
+import { swallowCookieMutationError } from "@/lib/supabase/cookie-helpers";
 
 export async function createSupabaseServerClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();

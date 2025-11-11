@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-export function MagicLinkForm({ redirectTo }: { redirectTo: string }) {
+export function MagicLinkForm({ redirectTo, redirectPath }: { redirectTo: string; redirectPath: string }) {
   const supabase = useSupabaseBrowserClient();
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -21,10 +21,13 @@ export function MagicLinkForm({ redirectTo }: { redirectTo: string }) {
     setStatus(null);
     setError(null);
 
+    const sanitizedRedirect = redirectPath.startsWith("/") ? redirectPath : "/dashboard";
+
     const { error: signInError } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo: redirectTo,
+        data: { redirect: sanitizedRedirect },
       },
     });
 

@@ -4,14 +4,22 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/route";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const redirectParam = url.searchParams.get("redirect") ?? "/dashboard";
-  const redirectPath = redirectParam.startsWith("/") ? redirectParam : `/dashboard`;
-  const redirectResponse = NextResponse.redirect(new URL(redirectPath, url.origin));
-  const { supabase, response } = createSupabaseRouteHandlerClient(request, redirectResponse);
+  const { supabase } = createSupabaseRouteHandlerClient(request);
 
   if (code) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return response;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const metadataRedirect = typeof user?.user_metadata?.redirect === "string"
+    ? user.user_metadata.redirect
+    : undefined;
+  const redirectPath = metadataRedirect && metadataRedirect.startsWith("/")
+    ? metadataRedirect
+    : "/dashboard";
+
+  return NextResponse.redirect(new URL(redirectPath, url.origin));
 }
