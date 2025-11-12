@@ -157,6 +157,13 @@ create policy "Users read own campaign histories"
     auth.uid() = (select user_id from public.campaigns where id = campaign_id)
   );
 
+create policy "Users insert own campaign histories"
+  on public.campaign_status_history
+  for insert
+  with check (
+    auth.uid() = (select user_id from public.campaigns where id = campaign_id)
+  );
+
 create table public.campaign_prospects (
   id uuid primary key default gen_random_uuid(),
   campaign_id uuid not null references public.campaigns(id) on delete cascade,
