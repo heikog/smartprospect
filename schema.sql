@@ -7,22 +7,49 @@ begin;
 create extension if not exists "pgcrypto" with schema public;
 create extension if not exists "citext" with schema public;
 
-create type public.campaign_status as enum (
-  'in_erstllg',
-  'bereit_zur_pruefung',
-  'geprueft',
-  'versandt'
-);
+do $$
+begin
+  if not exists (
+    select 1 from pg_type
+    where typname = 'campaign_status' and typnamespace = 'public'::regnamespace
+  ) then
+    create type public.campaign_status as enum (
+      'in_erstllg',
+      'bereit_zur_pruefung',
+      'geprueft',
+      'versandt'
+    );
+  end if;
+end;
+$$;
 
-create type public.credit_reason as enum (
-  'signup_bonus',
-  'purchase',
-  'generation_debit',
-  'manual_adjustment',
-  'refund'
-);
+do $$
+begin
+  if not exists (
+    select 1 from pg_type
+    where typname = 'credit_reason' and typnamespace = 'public'::regnamespace
+  ) then
+    create type public.credit_reason as enum (
+      'signup_bonus',
+      'purchase',
+      'generation_debit',
+      'manual_adjustment',
+      'refund'
+    );
+  end if;
+end;
+$$;
 
-create type public.job_kind as enum ('generation', 'send');
+do $$
+begin
+  if not exists (
+    select 1 from pg_type
+    where typname = 'job_kind' and typnamespace = 'public'::regnamespace
+  ) then
+    create type public.job_kind as enum ('generation', 'send');
+  end if;
+end;
+$$;
 
 create or replace function public.tg_set_updated_at()
 returns trigger
@@ -34,7 +61,7 @@ begin
 end;
 $$;
 
-create table public.profiles (
+create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   email citext unique,
   full_name text,
@@ -44,24 +71,27 @@ create table public.profiles (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists set_profiles_updated on public.profiles;
 create trigger set_profiles_updated
 before update on public.profiles
 for each row execute function public.tg_set_updated_at();
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "Users can read own profile" on public.profiles;
 create policy "Users can read own profile"
   on public.profiles
   for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can update own profile" on public.profiles;
 create policy "Users can update own profile"
   on public.profiles
   for update
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create table public.credit_events (
+create table if not exists public.credit_events (
   id bigserial primary key,
   user_id uuid not null references public.profiles(user_id) on delete cascade,
   reason public.credit_reason not null,
@@ -74,23 +104,24 @@ create table public.credit_events (
   created_at timestamptz not null default now()
 );
 
-create index credit_events_user_idx on public.credit_events(user_id);
+create index if not exists credit_events_user_idx on public.credit_events(user_id);
 
 alter table public.credit_events enable row level security;
 
+drop policy if exists "Users can see own credit events" on public.credit_events;
 create policy "Users can see own credit events"
   on public.credit_events
   for select
   using (auth.uid() = user_id);
 
-create view public.user_credit_balances as
+create or replace view public.user_credit_balances as
 select p.user_id,
        coalesce(sum(ce.delta), 0) as credits
 from public.profiles p
 left join public.credit_events ce on ce.user_id = p.user_id
 group by p.user_id;
 
-create table public.campaigns (
+create table if not exists public.campaigns (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(user_id) on delete cascade,
   name text not null,
@@ -107,9 +138,10 @@ create table public.campaigns (
   deleted_at timestamptz
 );
 
-create index campaigns_user_idx on public.campaigns(user_id);
-create index campaigns_status_idx on public.campaigns(status);
+create index if not exists campaigns_user_idx on public.campaigns(user_id);
+create index if not exists campaigns_status_idx on public.campaigns(status);
 
+drop trigger if exists set_campaigns_updated on public.campaigns;
 create trigger set_campaigns_updated
 before update on public.campaigns
 for each row execute function public.tg_set_updated_at();
@@ -126,18 +158,20 @@ begin
 end;
 $$;
 
+drop trigger if exists campaign_status_timestamp on public.campaigns;
 create trigger campaign_status_timestamp
 before update on public.campaigns
 for each row execute function public.tg_touch_campaign_status_change();
 
 alter table public.campaigns enable row level security;
 
+drop policy if exists "Users manage own campaigns" on public.campaigns;
 create policy "Users manage own campaigns"
   on public.campaigns
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-create table public.campaign_status_history (
+create table if not exists public.campaign_status_history (
   id bigserial primary key,
   campaign_id uuid not null references public.campaigns(id) on delete cascade,
   prior_status public.campaign_status,
@@ -146,10 +180,11 @@ create table public.campaign_status_history (
   created_at timestamptz not null default now()
 );
 
-create index campaign_status_history_campaign_idx on public.campaign_status_history(campaign_id);
+create index if not exists campaign_status_history_campaign_idx on public.campaign_status_history(campaign_id);
 
 alter table public.campaign_status_history enable row level security;
 
+drop policy if exists "Users read own campaign histories" on public.campaign_status_history;
 create policy "Users read own campaign histories"
   on public.campaign_status_history
   for select
@@ -157,6 +192,7 @@ create policy "Users read own campaign histories"
     auth.uid() = (select user_id from public.campaigns where id = campaign_id)
   );
 
+drop policy if exists "Users insert own campaign histories" on public.campaign_status_history;
 create policy "Users insert own campaign histories"
   on public.campaign_status_history
   for insert
@@ -164,7 +200,7 @@ create policy "Users insert own campaign histories"
     auth.uid() = (select user_id from public.campaigns where id = campaign_id)
   );
 
-create table public.campaign_prospects (
+create table if not exists public.campaign_prospects (
   id uuid primary key default gen_random_uuid(),
   campaign_id uuid not null references public.campaigns(id) on delete cascade,
   row_index integer not null,
@@ -186,14 +222,16 @@ create table public.campaign_prospects (
   updated_at timestamptz not null default now()
 );
 
-create unique index campaign_prospects_row_idx on public.campaign_prospects(campaign_id, row_index);
+create unique index if not exists campaign_prospects_row_idx on public.campaign_prospects(campaign_id, row_index);
 
+drop trigger if exists set_prospects_updated on public.campaign_prospects;
 create trigger set_prospects_updated
 before update on public.campaign_prospects
 for each row execute function public.tg_set_updated_at();
 
 alter table public.campaign_prospects enable row level security;
 
+drop policy if exists "Users manage own prospects" on public.campaign_prospects;
 create policy "Users manage own prospects"
   on public.campaign_prospects
   using (
@@ -203,7 +241,7 @@ create policy "Users manage own prospects"
     auth.uid() = (select user_id from public.campaigns where id = campaign_id)
   );
 
-create table public.n8n_job_runs (
+create table if not exists public.n8n_job_runs (
   id bigserial primary key,
   campaign_id uuid not null references public.campaigns(id) on delete cascade,
   kind public.job_kind not null,
@@ -215,10 +253,11 @@ create table public.n8n_job_runs (
   completed_at timestamptz
 );
 
-create index n8n_job_runs_campaign_idx on public.n8n_job_runs(campaign_id);
+create index if not exists n8n_job_runs_campaign_idx on public.n8n_job_runs(campaign_id);
 
 alter table public.n8n_job_runs enable row level security;
 
+drop policy if exists "Users read own n8n runs" on public.n8n_job_runs;
 create policy "Users read own n8n runs"
   on public.n8n_job_runs
   for select
@@ -226,7 +265,7 @@ create policy "Users read own n8n runs"
     auth.uid() = (select user_id from public.campaigns where id = campaign_id)
   );
 
-create table public.stripe_webhook_events (
+create table if not exists public.stripe_webhook_events (
   id bigserial primary key,
   stripe_event_id text not null unique,
   type text not null,
@@ -239,11 +278,12 @@ create table public.stripe_webhook_events (
 
 alter table public.stripe_webhook_events enable row level security;
 
+drop policy if exists "Service role only" on public.stripe_webhook_events;
 create policy "Service role only"
   on public.stripe_webhook_events
   using (false);
 
-create table public.stripe_checkout_sessions (
+create table if not exists public.stripe_checkout_sessions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(user_id) on delete cascade,
   stripe_session_id text not null unique,
@@ -258,14 +298,16 @@ create table public.stripe_checkout_sessions (
   updated_at timestamptz not null default now()
 );
 
-create index stripe_checkout_sessions_user_idx on public.stripe_checkout_sessions(user_id);
+create index if not exists stripe_checkout_sessions_user_idx on public.stripe_checkout_sessions(user_id);
 
+drop trigger if exists set_checkout_sessions_updated on public.stripe_checkout_sessions;
 create trigger set_checkout_sessions_updated
 before update on public.stripe_checkout_sessions
 for each row execute function public.tg_set_updated_at();
 
 alter table public.stripe_checkout_sessions enable row level security;
 
+drop policy if exists "Users read own checkout sessions" on public.stripe_checkout_sessions;
 create policy "Users read own checkout sessions"
   on public.stripe_checkout_sessions
   for select
@@ -299,6 +341,7 @@ begin
 end;
 $$;
 
+drop trigger if exists campaign_forward_status_only on public.campaigns;
 create trigger campaign_forward_status_only
 before update on public.campaigns
 for each row execute function public.assert_forward_campaign_status();
@@ -319,6 +362,7 @@ begin
 end;
 $$;
 
+drop trigger if exists campaign_status_audit on public.campaigns;
 create trigger campaign_status_audit
 after insert or update on public.campaigns
 for each row execute function public.log_campaign_status_change();
@@ -335,6 +379,7 @@ begin
 end;
 $$;
 
+drop trigger if exists campaign_rowcount_lock on public.campaigns;
 create trigger campaign_rowcount_lock
 before update on public.campaigns
 for each row execute function public.prevent_row_count_mutation();
@@ -380,6 +425,7 @@ begin
 end;
 $$;
 
+drop trigger if exists campaign_auto_debit on public.campaigns;
 create trigger campaign_auto_debit
 before insert on public.campaigns
 for each row execute function public.auto_debit_campaign_credits();
