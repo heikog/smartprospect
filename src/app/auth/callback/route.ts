@@ -5,7 +5,8 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client"
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const { supabase } = createSupabaseRouteHandlerClient(request);
+  const sessionResponse = NextResponse.next();
+  const { supabase, response } = createSupabaseRouteHandlerClient(request, sessionResponse);
 
   if (code) {
     await supabase.auth.exchangeCodeForSession(code);
@@ -22,10 +23,16 @@ export async function GET(request: NextRequest) {
     ? metadataRedirect
     : "/dashboard";
 
+  const redirectUrl = new URL(redirectPath, env.APP_BASE_URL);
+  const redirectResponse = NextResponse.redirect(redirectUrl);
+  response.cookies.getAll().forEach((cookie) => {
+    redirectResponse.cookies.set(cookie);
+  });
+
   console.log("Auth callback redirect", {
     requestUrl: request.url,
     redirectPath,
   });
 
-  return NextResponse.redirect(new URL(redirectPath, env.APP_BASE_URL));
+  return redirectResponse;
 }
