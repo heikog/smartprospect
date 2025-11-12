@@ -86,7 +86,7 @@ POST https://smartprospect.onrender.com/api/callback/n8n/send
 
 Excel/CSV Pflichtspalten:
 
-company_url | anrede | vorname | nachname | strasse | hausnummer | plz | ort
+anrede | vorname | nachname | strasse | hausnummer | plz | ort
 
 Downloadbare Vorlage (öffentlich, Supabase Bucket static):
 👉 Beispiel-Excel herunterladen￼

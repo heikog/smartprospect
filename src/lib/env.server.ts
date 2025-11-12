@@ -54,7 +54,6 @@ export const env = serverEnvSchema.parse({
 });
 
 export const requiredProspectColumns = [
-  "company_url",
   "anrede",
   "vorname",
   "nachname",
