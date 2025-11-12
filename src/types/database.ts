@@ -107,6 +107,7 @@ export type Database = {
           qr_code_path: string | null;
           flyer_pdf_path: string | null;
           landingpage_path: string | null;
+          video_url: string | null;
           error_log: Json | null;
           is_valid: boolean;
           tracking_token: string;
@@ -128,6 +129,7 @@ export type Database = {
           qr_code_path?: string | null;
           flyer_pdf_path?: string | null;
           landingpage_path?: string | null;
+          video_url?: string | null;
           error_log?: Json | null;
           is_valid?: boolean;
           tracking_token?: string;

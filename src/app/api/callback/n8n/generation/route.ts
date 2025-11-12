@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
         qr_code_path: prospect.qr_code_path ? String(prospect.qr_code_path) : null,
         flyer_pdf_path: prospect.flyer_pdf_path ? String(prospect.flyer_pdf_path) : null,
         landingpage_path: prospect.landingpage_path ? String(prospect.landingpage_path) : null,
+        video_url: prospect.video_url ? String(prospect.video_url) : null,
         error_log: prospect.error_log ?? null,
         is_valid: prospect.is_valid ?? true,
         tracking_token: prospect.tracking_token ? String(prospect.tracking_token) : randomUUID(),

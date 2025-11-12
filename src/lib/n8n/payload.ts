@@ -13,6 +13,7 @@ export const prospectSchema = z.object({
   qr_code_path: z.string().url().nullable().optional(),
   flyer_pdf_path: z.string().url().nullable().optional(),
   landingpage_path: z.string().url().nullable().optional(),
+  video_url: z.string().url().nullable().optional(),
   error_log: z.unknown().nullable().optional(),
   is_valid: z.boolean().optional().default(true),
   tracking_token: z.string().uuid().nullable().optional(),

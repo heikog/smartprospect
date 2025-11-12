@@ -60,17 +60,28 @@ export default async function ProspectLandingPage({
           >
             Mehr über uns
           </a>
-          {typedProspect.flyer_pdf_path && (
-            <a
-              href={typedProspect.flyer_pdf_path}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-full border border-white/40 px-6 py-3"
-            >
-              Flyer als PDF
-            </a>
-          )}
+        {typedProspect.flyer_pdf_path && (
+          <a
+            href={typedProspect.flyer_pdf_path}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full border border-white/40 px-6 py-3"
+          >
+            Flyer als PDF
+          </a>
+        )}
         </div>
+        {typedProspect.video_url && (
+          <div className="mt-8 overflow-hidden rounded-3xl bg-black/20 shadow-2xl">
+            <video
+              controls
+              playsInline
+              poster={typedProspect.flyer_pdf_path ?? undefined}
+              src={typedProspect.video_url}
+              className="h-auto w-full"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

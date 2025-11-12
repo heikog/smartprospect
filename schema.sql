@@ -215,6 +215,7 @@ create table if not exists public.campaign_prospects (
   qr_code_path text,
   flyer_pdf_path text,
   landingpage_path text,
+  video_url text,
   error_log jsonb,
   is_valid boolean not null default true,
   tracking_token uuid not null default gen_random_uuid(),
