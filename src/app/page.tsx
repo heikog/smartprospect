@@ -3,16 +3,16 @@ import { env } from "@/lib/env.server";
 
 const highlights = [
   {
-    title: "Supabase Magic Link Login",
+    title: "Magic-Link Login",
     description: "Onboarding ohne Passwort inkl. Starter-Credits & Profilverwaltung.",
   },
   {
-    title: "Kampagnen Orchestrierung",
+    title: "Automatisierte Kampagnen",
     description:
-      "Uploads werden direkt an n8n weitergereicht, Statuswechsel erfolgen automatisch über Callbacks.",
+      "Uploads werden direkt an unsere Orchestrierung weitergereicht, Statuswechsel erfolgen vollständig automatisiert.",
   },
   {
-    title: "Stripe Credits",
+    title: "Credits & Checkout",
     description: "Credits kaufen via Checkout & Webhook – 1 Credit entspricht genau einem Prospect.",
   },
 ];
@@ -30,7 +30,7 @@ export default function LandingPage() {
           </h1>
           <p className="text-lg text-slate-600 md:text-xl">
             Lade Excel-Listen & Service-PDFs hoch, wir kümmern uns um QR-Codes, Landingpages und den Versand über
-            n8n. Credits, Auth, Storage & n8n-Orchestrierung sind fix und fertig integriert.
+            unsere Automatisierung. Credits, Auth und Storage sind komplett integriert.
           </p>
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
@@ -63,16 +63,16 @@ export default function LandingPage() {
           <h2 className="text-2xl font-semibold text-slate-900">End-to-End Prozess</h2>
           <ol className="mt-6 space-y-4 text-slate-700">
             <li>
-              <strong className="text-slate-900">1. Anmeldung:</strong> Magic Link Login via Supabase → 5 Credits Startguthaben.
+              <strong className="text-slate-900">1. Anmeldung:</strong> Passwortloser Magic-Link Login → 5 Credits Startguthaben.
             </li>
             <li>
-              <strong className="text-slate-900">2. Upload & Generierung:</strong> Kampagne anlegen, Excel/PDF hochladen, n8n Workflow #1 erzeugt Assets & ruft Callback.
+              <strong className="text-slate-900">2. Upload & Generierung:</strong> Kampagne anlegen, Excel/PDF hochladen, die Automatisierung erzeugt Assets & ruft den Callback auf.
             </li>
             <li>
               <strong className="text-slate-900">3. Prüfung:</strong> Assets werden direkt im Dashboard kontrolliert, Statuswechsel per Klick.
             </li>
             <li>
-              <strong className="text-slate-900">4. Versand:</strong> Freigabe triggert n8n Workflow #2, Druck & Versand werden bestätigt.
+              <strong className="text-slate-900">4. Versand:</strong> Freigabe triggert den Versand-Workflow, Druck & Versand werden bestätigt.
             </li>
           </ol>
         </div>

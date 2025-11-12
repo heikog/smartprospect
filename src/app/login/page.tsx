@@ -27,7 +27,7 @@ export default function LoginPage({
           redirectPath={redirectPath}
         />
         <p className="text-center text-xs text-slate-400">
-          Mit dem Login akzeptierst du den Zugriff auf Supabase & Stripe in der Smart Prospect Instanz.
+          Mit dem Login akzeptierst du den Zugriff auf die angebundenen Backend-Dienste in der Smart Prospect Instanz.
         </p>
         <Link href="/" className="block text-center text-sm text-indigo-600 hover:underline">
           Zurück zur Übersicht

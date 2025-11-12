@@ -82,9 +82,9 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Prospects</h2>
-              <p className="text-sm text-slate-500">
-                n8n stellt Assets & Landingpage-Links bereit. Token-gesicherter Zugang über {env.APP_BASE_URL}/p/&lt;campaign&gt;/&lt;prospect&gt;
-              </p>
+            <p className="text-sm text-slate-500">
+                Unsere Automatisierung stellt Assets & Landingpage-Links bereit. Token-gesicherter Zugang über {env.APP_BASE_URL}/p/&lt;campaign&gt;/&lt;prospect&gt;
+            </p>
             </div>
             <Button asChild variant="secondary">
               <a href={`mailto:support@smartprospect.app?subject=Kampagne ${campaign.name}`}>Support kontaktieren</a>
@@ -138,7 +138,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             </table>
             {prospects.length === 0 && (
               <p className="py-6 text-center text-sm text-slate-500">
-                Noch keine Prospects importiert. Warte auf den Callback von n8n Workflow #1.
+                Noch keine Prospects importiert. Warte auf den automatisierten Callback des Generierungs-Workflows.
               </p>
             )}
           </div>

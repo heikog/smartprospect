@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Smart Prospect",
-  description: "MVP für personalisierte Offline-Flyer inkl. Supabase & Stripe Credits",
+  description: "MVP für personalisierte Offline-Flyer mit integriertem Creditsystem und Automatisierung",
 };
 
 export default function RootLayout({

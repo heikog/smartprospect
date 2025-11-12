@@ -78,7 +78,7 @@ export default async function DashboardPage() {
         <section className="space-y-4" id="campaigns">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-slate-900">Kampagnen</h2>
-            <p className="text-sm text-slate-500">Status-Updates kommen automatisch über die n8n Callbacks.</p>
+            <p className="text-sm text-slate-500">Status-Updates kommen automatisch über unsere Callbacks.</p>
           </div>
           <CampaignList campaigns={campaignItems} />
         </section>

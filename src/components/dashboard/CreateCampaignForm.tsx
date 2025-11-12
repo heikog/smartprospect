@@ -39,7 +39,7 @@ export function CreateCampaignForm({ excelTemplateUrl }: { excelTemplateUrl: str
     if (typeof payload.invalidRowCount === "number" && payload.invalidRowCount > 0) {
       setInvalidRowCount(payload.invalidRowCount);
     }
-    setStatus("Kampagne angelegt. n8n erstellt jetzt die Assets.");
+    setStatus("Kampagne angelegt. Die Automatisierung erstellt jetzt die Assets.");
     setName("");
     (event.target as HTMLFormElement).reset();
     setIsSubmitting(false);
