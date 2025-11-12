@@ -2,18 +2,19 @@ import Papa from "papaparse";
 import { read, utils } from "xlsx";
 import { requiredProspectColumns } from "@/lib/env.server";
 
-type ParsedRow = Record<string, string>;
+type ParsedRow = Record<string, string> & { row_index: number };
 
 export type ProspectParseResult = {
   rowCount: number;
   invalidRowCount: number;
   missingColumns: string[];
   preview: ParsedRow[];
+  rows: ParsedRow[];
 };
 
 function normalizeRows(rows: Record<string, unknown>[]): ParsedRow[] {
-  return rows.map((row) => {
-    const normalized: ParsedRow = {};
+  return rows.map((row, index) => {
+    const normalized: ParsedRow = { row_index: index + 1 } as ParsedRow;
     Object.entries(row).forEach(([key, value]) => {
       if (!key) return;
       normalized[key.trim().toLowerCase()] = String(value ?? "").trim();
@@ -84,5 +85,6 @@ export function parseProspectBuffer(buffer: Buffer, filename: string): ProspectP
     invalidRowCount,
     missingColumns: [],
     preview: validRows.slice(0, 5),
+    rows: validRows,
   };
 }

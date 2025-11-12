@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const prospectSchema = z.object({
-  row_index: z.coerce.number().int().positive(),
+  prospect_id: z.string().uuid().optional(),
+  row_index: z.coerce.number().int().positive().optional(),
   company_url: z.string().min(1),
   anrede: z.string().optional().default(""),
   vorname: z.string().optional().default(""),
@@ -13,6 +14,7 @@ export const prospectSchema = z.object({
   qr_code_path: z.string().url().nullable().optional(),
   flyer_pdf_path: z.string().url().nullable().optional(),
   landingpage_path: z.string().url().nullable().optional(),
+  slides_url: z.string().url().nullable().optional(),
   video_url: z.string().url().nullable().optional(),
   error_log: z.unknown().nullable().optional(),
   is_valid: z.boolean().optional().default(true),

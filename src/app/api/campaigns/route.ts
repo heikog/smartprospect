@@ -84,16 +84,60 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
+    const prospectRows = parseResult.rows.map((row) => {
+      const prospectId = randomUUID();
+      const value = (key: string) => row[key] ?? "";
+      return {
+        id: prospectId,
+        campaign_id: campaignId,
+        row_index: row.row_index,
+        company_url: value("company_url"),
+        anrede: value("anrede"),
+        vorname: value("vorname"),
+        nachname: value("nachname"),
+        strasse: value("strasse"),
+        hausnummer: value("hausnummer"),
+        plz: value("plz"),
+        ort: value("ort"),
+      };
+    });
+
+    if (prospectRows.length) {
+      const { error: prospectInsertError } = await supabase
+        .from("campaign_prospects")
+        .insert(prospectRows);
+
+      if (prospectInsertError) {
+        throw prospectInsertError;
+      }
+    }
+
+    const prospectsPayload = prospectRows.map((prospect) => {
+      const basePath = `campaigns/${campaignId}/prospects/${prospect.id}`;
+      return {
+        prospectId: prospect.id,
+        rowIndex: prospect.row_index,
+        storage: {
+          basePath,
+          video: `${basePath}/video.mp4`,
+          slides: `${basePath}/slides.pdf`,
+          flyer: `${basePath}/flyer.pdf`,
+        },
+      };
+    });
+
     const payload = {
       campaignId,
       userId: user.id,
       excelPath: excelUpload.path,
       servicePdfPath: pdfUpload.path,
       callbackUrl: env.N8N_GENERATION_CALLBACK_URL,
+      storageBucket: env.SUPABASE_STORAGE_BUCKET_UPLOADS,
       metadata: {
         name,
         rowCount: parseResult.rowCount,
       },
+      prospects: prospectsPayload,
     };
 
     await triggerN8nWorkflow(env.N8N_GENERATION_WEBHOOK_URL, payload);

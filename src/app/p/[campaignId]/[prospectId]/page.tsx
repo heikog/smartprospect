@@ -70,6 +70,16 @@ export default async function ProspectLandingPage({
             Flyer als PDF
           </a>
         )}
+        {typedProspect.slides_url && (
+          <a
+            href={typedProspect.slides_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full border border-white/40 px-6 py-3"
+          >
+            Präsentation ansehen
+          </a>
+        )}
         </div>
         {typedProspect.video_url && (
           <div className="mt-8 overflow-hidden rounded-3xl bg-black/20 shadow-2xl">

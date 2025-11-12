@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env.server";
-import type { TablesInsert } from "@/types/database";
+import type { Json, TablesInsert } from "@/types/database";
 
 function verifySecret(request: NextRequest) {
   if (!env.N8N_SHARED_SECRET) return true;
@@ -39,27 +38,47 @@ export async function POST(request: NextRequest) {
       .eq("id", campaignId);
 
     if (Array.isArray(payload.prospects) && payload.prospects.length) {
-      const rows = payload.prospects.map((prospect: Record<string, unknown>, index: number) => ({
-        campaign_id: campaignId,
-        row_index: Number(prospect.row_index ?? index + 1),
-        company_url: String(prospect.company_url ?? ""),
-        anrede: String(prospect.anrede ?? ""),
-        vorname: String(prospect.vorname ?? ""),
-        nachname: String(prospect.nachname ?? ""),
-        strasse: String(prospect.strasse ?? ""),
-        hausnummer: String(prospect.hausnummer ?? ""),
-        plz: String(prospect.plz ?? ""),
-        ort: String(prospect.ort ?? ""),
-        qr_code_path: prospect.qr_code_path ? String(prospect.qr_code_path) : null,
-        flyer_pdf_path: prospect.flyer_pdf_path ? String(prospect.flyer_pdf_path) : null,
-        landingpage_path: prospect.landingpage_path ? String(prospect.landingpage_path) : null,
-        video_url: prospect.video_url ? String(prospect.video_url) : null,
-        error_log: prospect.error_log ?? null,
-        is_valid: prospect.is_valid ?? true,
-        tracking_token: prospect.tracking_token ? String(prospect.tracking_token) : randomUUID(),
-      } as TablesInsert<"campaign_prospects">));
+      const updatePromises = payload.prospects.map(async (prospect: Record<string, unknown>, index: number) => {
+        const prospectId = typeof prospect.prospect_id === "string" ? prospect.prospect_id : null;
+        const rowIndex = typeof prospect.row_index === "number" ? prospect.row_index : index + 1;
+        const updateData: Partial<TablesInsert<"campaign_prospects">> = {
+          company_url: prospect.company_url ? String(prospect.company_url) : undefined,
+          anrede: prospect.anrede ? String(prospect.anrede) : undefined,
+          vorname: prospect.vorname ? String(prospect.vorname) : undefined,
+          nachname: prospect.nachname ? String(prospect.nachname) : undefined,
+          strasse: prospect.strasse ? String(prospect.strasse) : undefined,
+          hausnummer: prospect.hausnummer ? String(prospect.hausnummer) : undefined,
+          plz: prospect.plz ? String(prospect.plz) : undefined,
+          ort: prospect.ort ? String(prospect.ort) : undefined,
+          qr_code_path: prospect.qr_code_path ? String(prospect.qr_code_path) : undefined,
+          flyer_pdf_path: prospect.flyer_pdf_path ? String(prospect.flyer_pdf_path) : undefined,
+          landingpage_path: prospect.landingpage_path ? String(prospect.landingpage_path) : undefined,
+          slides_url: prospect.slides_url ? String(prospect.slides_url) : undefined,
+          video_url: prospect.video_url ? String(prospect.video_url) : undefined,
+          error_log: (prospect.error_log as Json | null) ?? undefined,
+          is_valid: typeof prospect.is_valid === "boolean" ? prospect.is_valid : undefined,
+          tracking_token: prospect.tracking_token ? String(prospect.tracking_token) : undefined,
+        };
 
-      await supabase.from("campaign_prospects").upsert(rows, { onConflict: "campaign_id,row_index" });
+        const cleanedUpdate = Object.fromEntries(
+          Object.entries(updateData).filter(([, value]) => value !== undefined),
+        );
+
+        if (Object.keys(cleanedUpdate).length === 0) {
+          return;
+        }
+
+        let query = supabase.from("campaign_prospects").update(cleanedUpdate).eq("campaign_id", campaignId);
+        if (prospectId) {
+          query = query.eq("id", prospectId);
+        } else {
+          query = query.eq("row_index", rowIndex);
+        }
+
+        await query;
+      });
+
+      await Promise.all(updatePromises);
     }
   }
 
