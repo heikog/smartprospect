@@ -5,7 +5,7 @@ import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client"
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const sessionResponse = NextResponse.next();
+  const sessionResponse = new NextResponse();
   const { supabase, response } = createSupabaseRouteHandlerClient(request, sessionResponse);
 
   if (code) {

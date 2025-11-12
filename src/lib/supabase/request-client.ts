@@ -7,7 +7,7 @@ import { swallowCookieMutationError } from "@/lib/supabase/cookie-helpers";
 
 export function createSupabaseRouteHandlerClient(
   request: NextRequest,
-  response: NextResponse = NextResponse.next(),
+  response: NextResponse = new NextResponse(),
 ): {
   supabase: SupabaseClient<Database>;
   response: NextResponse;
