@@ -1,8 +1,7 @@
 "use client";
 
-import { forwardRef } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { cloneElement, forwardRef, isValidElement } from "react";
+import type { ButtonHTMLAttributes, ReactElement, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -24,21 +23,33 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", icon, children, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
+    const classes = cn(
+      "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+      variantStyles[variant],
+      className,
+    );
+
+    if (asChild) {
+      if (!isValidElement(children)) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Button with asChild requires a single valid React element child.");
+        }
+        return null;
+      }
+
+      const child = children as ReactElement<{ className?: string }>;
+
+      return cloneElement(child, {
+        ...(props as Record<string, unknown>),
+        className: cn(classes, child.props.className),
+      });
+    }
 
     return (
-      <Comp
-        ref={ref as never}
-        className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
-          variantStyles[variant],
-          className,
-        )}
-        {...props}
-      >
+      <button ref={ref} className={classes} {...props}>
         {icon}
         {children}
-      </Comp>
+      </button>
     );
   },
 );
