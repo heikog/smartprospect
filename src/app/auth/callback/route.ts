@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/lib/env.server";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/request-client";
 
 export async function GET(request: NextRequest) {
@@ -26,5 +27,5 @@ export async function GET(request: NextRequest) {
     redirectPath,
   });
 
-  return NextResponse.redirect(new URL(redirectPath, url.origin));
+  return NextResponse.redirect(new URL(redirectPath, env.APP_BASE_URL));
 }
