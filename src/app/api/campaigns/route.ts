@@ -112,12 +112,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const generatedBucket = env.SUPABASE_STORAGE_BUCKET_STATIC;
     const prospectsPayload = prospectRows.map((prospect) => {
       const basePath = `campaigns/${campaignId}/prospects/${prospect.id}`;
       return {
         prospectId: prospect.id,
         rowIndex: prospect.row_index,
         storage: {
+          bucket: generatedBucket,
           basePath,
           video: `${basePath}/video.mp4`,
           slides: `${basePath}/slides.pdf`,
@@ -132,7 +134,10 @@ export async function POST(request: NextRequest) {
       excelPath: excelUpload.path,
       servicePdfPath: pdfUpload.path,
       callbackUrl: env.N8N_GENERATION_CALLBACK_URL,
-      storageBucket: env.SUPABASE_STORAGE_BUCKET_UPLOADS,
+      storageBuckets: {
+        source: env.SUPABASE_STORAGE_BUCKET_UPLOADS,
+        generated: generatedBucket,
+      },
       metadata: {
         name,
         rowCount: parseResult.rowCount,

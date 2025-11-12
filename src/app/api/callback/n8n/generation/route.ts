@@ -3,6 +3,14 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env.server";
 import type { Json, TablesInsert } from "@/types/database";
 
+function buildPublicStaticUrl(relativePath: unknown): string | undefined {
+  if (typeof relativePath !== "string" || !relativePath.trim()) {
+    return undefined;
+  }
+  const normalized = relativePath.replace(/^\/+/, "");
+  return `${env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${env.SUPABASE_STORAGE_BUCKET_STATIC}/${normalized}`;
+}
+
 function verifySecret(request: NextRequest) {
   if (!env.N8N_SHARED_SECRET) return true;
   const headerValue = request.headers.get(env.N8N_AUTH_HEADER.toLowerCase()) ?? request.headers.get(env.N8N_AUTH_HEADER);
@@ -51,10 +59,25 @@ export async function POST(request: NextRequest) {
           plz: prospect.plz ? String(prospect.plz) : undefined,
           ort: prospect.ort ? String(prospect.ort) : undefined,
           qr_code_path: prospect.qr_code_path ? String(prospect.qr_code_path) : undefined,
-          flyer_pdf_path: prospect.flyer_pdf_path ? String(prospect.flyer_pdf_path) : undefined,
+          flyer_pdf_path:
+            prospect.flyer_storage_path
+              ? buildPublicStaticUrl(prospect.flyer_storage_path)
+              : prospect.flyer_pdf_path
+                ? String(prospect.flyer_pdf_path)
+                : undefined,
           landingpage_path: prospect.landingpage_path ? String(prospect.landingpage_path) : undefined,
-          slides_url: prospect.slides_url ? String(prospect.slides_url) : undefined,
-          video_url: prospect.video_url ? String(prospect.video_url) : undefined,
+          slides_url:
+            prospect.slides_storage_path
+              ? buildPublicStaticUrl(prospect.slides_storage_path)
+              : prospect.slides_url
+                ? String(prospect.slides_url)
+                : undefined,
+          video_url:
+            prospect.video_storage_path
+              ? buildPublicStaticUrl(prospect.video_storage_path)
+              : prospect.video_url
+                ? String(prospect.video_url)
+                : undefined,
           error_log: (prospect.error_log as Json | null) ?? undefined,
           is_valid: typeof prospect.is_valid === "boolean" ? prospect.is_valid : undefined,
           tracking_token: prospect.tracking_token ? String(prospect.tracking_token) : undefined,
